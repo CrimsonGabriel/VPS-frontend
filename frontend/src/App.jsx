@@ -10,7 +10,8 @@ import UsersPage from './pages/UsersPage';
 import ApiTestPage from './pages/ApiTestPage';
 import GlobalLayout from './components/GlobalLayout'; // <-- Kluczowy import
 import ForbiddenPage from './pages/ForbiddenPage';
-
+import FileUploadPage from './pages/FileUploadPage.jsx';
+import FileListPage from './pages/FileListPage.jsx';
 function App() {
   return (
     <Routes>
@@ -28,6 +29,8 @@ function App() {
           <Route path="/status-ip" element={<StatusIpPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/api-test" element={<ApiTestPage />} />
+	  <Route path="/upload" element={<FileUploadPage />} />
+    	  <Route path="/files" element={<FileListPage />} />
         </Route>
         
       </Route>

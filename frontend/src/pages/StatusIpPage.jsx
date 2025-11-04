@@ -4,6 +4,8 @@ import {
   VStack, List, ListItem, ListIcon, Tag
 } from '@chakra-ui/react'
 import { CheckCircleIcon, WarningIcon } from '@chakra-ui/icons'
+// Importujemy hooka (to już miałeś)
+import { useAuth } from '../context/AuthContext';
 
 // URL do Twojego API
 const API_URL = '/status/json'
@@ -12,12 +14,26 @@ function StatusIpPage() {
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  // Pobieramy funkcję do brania tokena (to już miałeś)
+  const { getToken } = useAuth();
 
   const fetchStatus = async () => {
     try {
-      const response = await fetch(API_URL)
+      // Pobieramy token (to już miałeś)
+	  const token = getToken();
+
+      // === POPRAWKA TUTAJ ===
+      // Dodajemy obiekt 'headers' do zapytania 'fetch'
+      const response = await fetch(API_URL, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      // === KONIEC POPRAWKI ===
+
       if (!response.ok) {
-        throw new Error(`Błąd HTTP: ${response.status}`)
+        // Jeśli Spring Boot zwróci 401 lub 403, rzucimy błąd
+        throw new Error(`Błąd HTTP: ${response.status} (${response.statusText})`)
       }
       const data = await response.json()
       setStatus(data)
@@ -32,10 +48,8 @@ function StatusIpPage() {
 
   
   useEffect(() => {
-    fetchStatus() // Uruchom od razu
+    fetchStatus() 
     const intervalId = setInterval(fetchStatus, 5000) 
-
-    
     return () => clearInterval(intervalId)
   }, []) 
 

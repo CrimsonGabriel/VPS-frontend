@@ -3,6 +3,8 @@ import {
   Box, Heading, Text, Spinner, Alert, AlertIcon,
   VStack, List, ListItem, Tag
 } from '@chakra-ui/react'
+// 1. Importujemy hooka
+import { useAuth } from '../context/AuthContext';
 
 const API_URL = '/status/json'
 
@@ -10,10 +12,23 @@ function UsersPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  // 2. Pobieramy funkcję do brania tokena
+  const { getToken } = useAuth();
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch(API_URL)
+      // 3. Pobieramy token i dodajemy go do nagłówka 'fetch'
+      const token = getToken();
+      const response = await fetch(API_URL, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      // === Koniec zmian ===
+
+      if (!response.ok) {
+        throw new Error(`Błąd HTTP: ${response.status} (${response.statusText})`)
+      }
       const data = await response.json()
       setData(data)
       setError(null)

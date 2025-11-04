@@ -1,47 +1,80 @@
 import React, { createContext, useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// Tworzymy kontekst
 const AuthContext = createContext(null);
 
-// To jest "dostawca" kontekstu, który będzie otaczał naszą aplikację
+// Ta funkcja będzie przechowywać token JWT w pamięci przeglądarki
+const getToken = () => localStorage.getItem('authToken');
+const setToken = (token) => localStorage.setItem('authToken', token);
+const removeToken = () => localStorage.removeItem('authToken');
+
 export const AuthProvider = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Sprawdzamy, czy token już istnieje przy starcie aplikacji
+  const [isAuthenticated, setIsAuthenticated] = useState(!!getToken());
   const navigate = useNavigate();
 
-  // === MOCK LOGIN ===
-  // Tutaj jest nasza "mądra" logika na sztywno.
-  // W przyszłości zamienisz to na wywołanie API do Spring Boota.
+  // === NOWA LOGIKA LOGOWANIA ===
+  // Ta funkcja będzie rozmawiać z Twoim Spring Bootem
   const login = async (username, password) => {
-    console.log('Próba logowania z:', username, password);
-    if (username === 'admin' && password === 'admin') {
+    console.log('Wysyłanie próby logowania do Spring Boot...');
+    
+    // KROK 1: Wyślij zapytanie do backendu (Spring Boot)
+    // UWAGA: Musisz stworzyć ten endpoint (/api/auth/login) w Springu!
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: username, password: password }), // Dopasuj do DTO w Springu
+      });
+
+      if (!response.ok) {
+        // Jeśli serwer zwróci błąd (np. 401 Unauthorized)
+        throw new Error('Nieprawidłowy login lub hasło');
+      }
+
+      // KROK 2: Odbierz odpowiedź (oczekujemy tokena JWT)
+      const data = await response.json(); 
+      const jwtToken = data.token; // Zakładając, że Spring zwraca { "token": "..." }
+
+      if (!jwtToken) {
+        throw new Error('Nie otrzymano tokena JWT z serwera');
+      }
+
+      // KROK 3: Zapisz token i zaktualizuj stan
+      setToken(jwtToken); // Zapisz token w localStorage
       setIsAuthenticated(true);
-      console.log('Logowanie pomyślne');
-      // Przekieruj na stronę statusu po udanym logowaniu
+      console.log('Logowanie pomyślne, zapisano JWT.');
+      
+      // Przekierowanie na stronę główną (zgodnie z Twoją prośbą)
       navigate('/'); 
       return true;
+
+    } catch (error) {
+      console.error('Błąd logowania:', error.message);
+      removeToken();
+      setIsAuthenticated(false);
+      return false;
     }
-    console.log('Logowanie nieudane');
-    return false;
   };
 
   const logout = () => {
+    removeToken(); // Usuń token
     setIsAuthenticated(false);
-    // Przekieruj na stronę logowania po wylogowaniu
-    navigate('/'); 
+    navigate('/'); // Przekieruj na stronę główną (zgodnie z Twoją prośbą)
   };
 
-  // Udostępniamy stan i funkcje "dzieciom"
   const value = {
     isAuthenticated,
     login,
     logout,
+    getToken, // Udostępniamy funkcję pobierania tokena
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Własny "hook", aby łatwo korzystać z kontekstu w innych komponentach
 export const useAuth = () => {
   return useContext(AuthContext);
 };

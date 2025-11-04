@@ -46,6 +46,12 @@ function Navbar() {
           <Link as={RouterLink} to="/api-test" color="blue.300" fontWeight="medium">
             Test API
           </Link>
+	  <Link as={RouterLink} to="/upload" color="blue.300" fontWeight="medium">
+            Wyślij Plik
+          </Link>
+          <Link as={RouterLink} to="/files" color="blue.300" fontWeight="medium">
+            Pobrane Pliki
+          </Link>
         </Flex>
       </Flex>
     </Box>
