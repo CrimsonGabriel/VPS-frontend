@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
-
+import { useAuth } from '../context/AuthContext';
 // Prosty styl dla strefy upuszczania
 const dropzoneStyle = {
   flex: 1,
@@ -20,19 +20,29 @@ const dropzoneStyle = {
 };
 
 function FileUploadPage() {
+  const { getToken, logout } = useAuth(); // ⭐️ UŻYCIE ⭐️
 
   const onDrop = useCallback(acceptedFiles => {
-    // Robimy to dla każdego pliku, jeśli pozwalasz na multi-upload
+    
+    const token = getToken();
+    if (!token) {
+        console.error('Błąd wysyłania pliku: Brak tokena JWT.');
+        alert('Błąd: Brak uwierzytelnienia. Zaloguj się ponownie.');
+        logout(); // Wymuś wylogowanie/przekierowanie
+        return;
+    }
+
     acceptedFiles.forEach(file => {
       
-      // Musimy użyć FormData, aby wysłać plik
       const formData = new FormData();
-      formData.append('file', file); // 'file' musi pasować do @RequestParam("file")
+      formData.append('file', file); 
 
       // Wysyłamy plik do Spring Boota
       axios.post('/api/files/upload', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data'
+          'Content-Type': 'multipart/form-data',
+          // ⭐️ KLUCZOWA POPRAWKA: AUTORYZACJA ⭐️
+          'Authorization': `Bearer ${token}` 
         }
       })
       .then(response => {
@@ -40,11 +50,11 @@ function FileUploadPage() {
         alert('Plik wgrany pomyślnie!');
       })
       .catch(error => {
-        console.error('Błąd wysyłania pliku:', error);
-        alert('Błąd wysyłania pliku.');
+        console.error('Błąd wysyłania pliku:', error.response?.data?.message || error.message);
+        alert('Błąd wysyłania pliku: ' + (error.response?.data?.message || 'Sprawdź konsolę.'));
       });
     });
-  }, []);
+  }, [getToken, logout]); // Dodaj dependency array
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 

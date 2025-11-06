@@ -1,22 +1,54 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+// Zmieniamy import z axios na useAuth
+// import axios from 'axios'; 
+import { useAuth } from '../context/AuthContext';
+
+// Używamy fetch zamiast axios, aby ułatwić dodanie nagłówka Authorization
+const API_LIST_URL = '/api/files'; 
 
 function FileListPage() {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { getToken } = useAuth(); // ⭐️ UŻYCIE useAuth ⭐️
+
+  const fetchFiles = async () => {
+    setLoading(true);
+    const token = getToken(); // ⭐️ POBIERZ TOKEN ⭐️
+
+    // 🛑 Wymagane, jeśli endpoint jest chroniony
+    if (!token) {
+        console.warn("Brak tokena, nie można pobrać listy plików.");
+        setLoading(false);
+        return; 
+    }
+
+    try {
+        // Zastępujemy axios.get(..) funkcją fetch(..)
+        const response = await fetch(API_LIST_URL, {
+            headers: {
+                // ⭐️ DODAJ NAGŁÓWEK AUTORYZACYJNY ⭐️
+                'Authorization': `Bearer ${token}`, 
+            }
+        });
+
+        if (response.status === 401 || response.status === 403) {
+            throw new Error(`Błąd autoryzacji (${response.status}). Upewnij się, że token jest ważny.`);
+        }
+        if (!response.ok) {
+            throw new Error(`Błąd serwera: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        setFiles(data); // Oczekujemy listy [FileRecord, FileRecord, ...]
+    } catch (error) {
+        console.error("Błąd pobierania listy plików:", error.message);
+    } finally {
+        setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Pobieramy listę plików z backendu
-    axios.get('/api/files')
-      .then(response => {
-        // Oczekujemy listy [FileRecord, FileRecord, ...]
-        setFiles(response.data);
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error('Błąd pobierania listy plików:', error);
-        setLoading(false);
-      });
+    fetchFiles();
   }, []); // Pusta tablica = uruchom raz przy montowaniu
 
   // Funkcja pomocnicza do formatowania rozmiaru

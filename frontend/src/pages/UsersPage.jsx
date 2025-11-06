@@ -1,37 +1,253 @@
-import { useState, useEffect } from 'react'
+// 💾 src/pages/UsersPage.jsx (POPRAWKA SYNCHRONIZACJI I 401)
+
+import { useState, useEffect } from 'react';
 import {
   Box, Heading, Text, Spinner, Alert, AlertIcon,
-  VStack, List, ListItem, Tag
-} from '@chakra-ui/react'
-// 1. Importujemy hooka
+  VStack, List, ListItem, Tag, Button, HStack, useToast,
+  // Nowe komponenty dla CRUD:
+  Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter,
+  ModalCloseButton, FormControl, FormLabel, Input, Checkbox
+} from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
+import { FaEdit, FaTrash, FaUserPlus } from 'react-icons/fa'; // Import ikon
 
-const API_URL = '/status/json'
+// ⭐️ Endpoint panelu ADMINA ⭐️
+const API_URL = '/api/admin/users';
+
+// --- Komponent Formularza (Dodawanie/Edytowanie) ---
+// BEZ ZMIAN W KOMPONENCIE UserForm
+
+const UserForm = ({ initialData, isOpen, onClose, fetchUsers }) => {
+    const toast = useToast();
+    const { getToken } = useAuth();
+    
+    const [formData, setFormData] = useState({
+        email: initialData?.email || '',
+        name: initialData?.name || '',
+        password: '', 
+        isAdmin: initialData?.role === 'ADMIN' || false,
+    });
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (initialData) {
+            setFormData({
+                email: initialData.email || '',
+                name: initialData.name || '',
+                password: '',
+                isAdmin: initialData.role === 'ADMIN' || false,
+            });
+        } else {
+            setFormData({ email: '', name: '', password: '', isAdmin: false });
+        }
+    }, [initialData]);
+
+    const handleChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        const token = getToken();
+
+        if (!initialData && !formData.password) {
+            toast({
+                title: 'Błąd walidacji',
+                description: 'Hasło jest wymagane przy tworzeniu nowego użytkownika.',
+                status: 'warning',
+                duration: 5000,
+                isClosable: true,
+            });
+            setLoading(false);
+            return;
+        }
+
+        if (!formData.email) {
+            toast({
+                title: 'Błąd walidacji',
+                description: 'Email jest wymagany.',
+                status: 'warning',
+                duration: 5000,
+                isClosable: true,
+            });
+            setLoading(false);
+            return;
+        }
+
+
+        const method = initialData ? 'PUT' : 'POST';
+        const url = initialData ? `${API_URL}/${initialData.id}` : API_URL;
+
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(formData)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Błąd HTTP: ${response.status}. Odpowiedź: ${errorText}`);
+            }
+
+            toast({
+                title: initialData ? 'Edycja pomyślna' : 'Utworzenie pomyślne',
+                description: `Użytkownik ${formData.email} został zapisany.`,
+                status: 'success',
+                duration: 3000,
+                isClosable: true,
+            });
+
+            fetchUsers();
+            onClose(); 
+
+        } catch (err) {
+            toast({
+                title: 'Błąd operacji',
+                description: err.message,
+                status: 'error',
+                duration: 5000,
+                isClosable: true,
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose}>
+            <ModalOverlay />
+            <ModalContent>
+                <ModalHeader>{initialData ? 'Edytuj Użytkownika' : 'Dodaj Użytkownika'}</ModalHeader>
+                <ModalCloseButton />
+                <form onSubmit={handleSubmit}>
+                    <ModalBody pb={6}>
+                        <FormControl isRequired>
+                            <FormLabel>Email</FormLabel>
+                            <Input 
+                                placeholder="E-mail" 
+                                name="email" 
+                                value={formData.email} 
+                                onChange={handleChange} 
+                                isDisabled={!!initialData} 
+                            />
+                        </FormControl>
+
+                        <FormControl mt={4}>
+                            <FormLabel>Imię/Nazwa</FormLabel>
+                            <Input 
+                                placeholder="Imię lub Nickname" 
+                                name="name" 
+                                value={formData.name} 
+                                onChange={handleChange} 
+                            />
+                        </FormControl>
+
+                        <FormControl mt={4} isRequired={!initialData}>
+                            <FormLabel>Hasło</FormLabel>
+                            <Input 
+                                placeholder={initialData ? 'Zostaw puste, aby nie zmieniać' : 'Wpisz hasło'}
+                                type="password" 
+                                name="password" 
+                                value={formData.password} 
+                                onChange={handleChange} 
+                            />
+                        </FormControl>
+
+                        <FormControl mt={4}>
+                            <Checkbox 
+                                name="isAdmin" 
+                                isChecked={formData.isAdmin} 
+                                onChange={handleChange}
+                                colorScheme="red"
+                                isDisabled={initialData?.email === 'admin'} 
+                            >
+                                Użytkownik jest administratorem (ADMIN)
+                            </Checkbox>
+                        </FormControl>
+                        
+                    </ModalBody>
+
+                    <ModalFooter>
+                        <Button colorScheme="blue" mr={3} type="submit" isLoading={loading}>
+                            {initialData ? 'Zapisz zmiany' : 'Dodaj'}
+                        </Button>
+                        <Button onClick={onClose}>Anuluj</Button>
+                    </ModalFooter>
+                </form>
+            </ModalContent>
+        </Modal>
+    );
+};
+// --- Koniec Komponentu Formularza ---
+
 
 function UsersPage() {
-  const [data, setData] = useState(null)
+  const [users, setUsers] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  // 2. Pobieramy funkcję do brania tokena
-  const { getToken } = useAuth();
+  
+  // Stany dla Modala
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState(null)
+
+  // ⭐️ POPRAWKA: POBIERAMY RÓWNIEŻ STANY AUTHENTYKACJI ⭐️
+  const { getToken, isAuthenticated, loading: authLoading, logout } = useAuth();
+  const toast = useToast();
 
   const fetchUsers = async () => {
+    setLoading(true); // Ustawiamy loading na true na początku
     try {
-      // 3. Pobieramy token i dodajemy go do nagłówka 'fetch'
       const token = getToken();
+      
+      // Choć ProtectedRoute powinien to wyłapać, ten check jest backupem
+      if (!token) {
+        // Zamiast ustawiać error, robimy logout (co przeniesie do /login)
+        logout(); 
+        return;
+      }
+      
       const response = await fetch(API_URL, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      // === Koniec zmian ===
-
-      if (!response.ok) {
-        throw new Error(`Błąd HTTP: ${response.status} (${response.statusText})`)
+      
+      
+      if (response.status === 401) {
+          throw new Error("Błąd 401: Sesja wygasła. Proszę zalogować się ponownie.");
       }
+      
+      if (response.status === 403) {
+        throw new Error("Brak uprawnień. Tylko użytkownik z rolą ADMIN ma dostęp. (Error 403)");
+      }
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        // Próbujemy parsować JSON dla czytelniejszego błędu
+        let errorMsg = `Błąd HTTP: ${response.status}.`;
+        try {
+            const errorJson = JSON.parse(errorText);
+            errorMsg += ` Odpowiedź: ${errorJson.message || errorJson.error || errorText}`;
+        } catch (e) {
+            errorMsg += ` Odpowiedź: ${errorText}`;
+        }
+        throw new Error(errorMsg);
+      }
+      
       const data = await response.json()
-      setData(data)
+      setUsers(data)
       setError(null)
+
     } catch (err) {
       setError(err.message)
     } finally {
@@ -39,13 +255,85 @@ function UsersPage() {
     }
   }
 
-  useEffect(() => {
-    fetchUsers()
-    const intervalId = setInterval(fetchUsers, 5000)
-    return () => clearInterval(intervalId)
-  }, [])
+  // Użycie: Otwiera modal w trybie edycji
+  const handleOpenEdit = (user) => {
+    setEditingUser(user);
+    setIsModalOpen(true);
+  };
 
-  if (loading && !data) {
+  // Użycie: Otwiera modal w trybie dodawania
+  const handleOpenCreate = () => {
+    setEditingUser(null);
+    setIsModalOpen(true);
+  };
+
+  // Użycie: Zamyka modal
+  const handleClose = () => {
+    setIsModalOpen(false);
+    setEditingUser(null);
+  };
+
+  // Użycie: Usuwanie użytkownika (logika bez zmian)
+  const handleDelete = async (id) => {
+    const token = getToken();
+
+    if (!window.confirm("Czy na pewno chcesz usunąć tego użytkownika?")) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.status === 204) { 
+            toast({
+                title: 'Usunięto pomyślnie.',
+                description: `Użytkownik o ID ${id} został usunięty.`,
+                status: 'success',
+                duration: 3000,
+                isClosable: true,
+            });
+            fetchUsers();
+        } else if (response.status === 403) {
+            throw new Error("Brak uprawnień do usunięcia (lub próba usunięcia głównego admina).");
+        } else {
+            const errorText = await response.text();
+            throw new Error(`Błąd HTTP: ${response.status}. Odpowiedź: ${errorText}`);
+        }
+
+    } catch (err) {
+        toast({
+            title: 'Błąd usuwania',
+            description: err.message,
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+        });
+    }
+  };
+
+
+  useEffect(() => {
+    // ⭐️ NOWA LOGIKA: Wywołaj fetchUsers tylko, gdy kontekst jest załadowany i uwierzytelniony ⭐️
+    if (!authLoading && isAuthenticated) {
+        fetchUsers()
+    } else if (!authLoading && !isAuthenticated) {
+        // Jeśli ładowanie się skończyło, ale nie jesteśmy uwierzytelnieni (choć ProtectedRoute nas tu nie wpuścił),
+        // to ustawiamy loading na false, aby widzieć error.
+        setLoading(false);
+    }
+  }, [isAuthenticated, authLoading]); // Zależności od stanu AuthContext
+
+  // ⭐️ DODAJEMY SPRAWDZANIE ŁADOWANIA KONTEKSTU ⭐️
+  if (authLoading) {
+      return <div>Weryfikacja kontekstu...</div>;
+  }
+  
+  if (loading && !users) {
     return <Spinner size="xl" />
   }
 
@@ -53,35 +341,92 @@ function UsersPage() {
     return (
       <Alert status="error">
         <AlertIcon />
-        Nie można połączyć się z serwerem: {error}
+        Błąd: {error}
       </Alert>
     )
   }
 
-  const users = data?.authorizedUsers || []
-  const users2FA = data?.users2FAStatus || {}
+  const userList = users || [] 
 
   return (
     <Box p={5} shadow="md" borderWidth="1px" borderRadius="md" bg="gray.800">
-      <Heading size="lg" mb={4}>Autoryzowani Użytkownicy</Heading>
-      {users.length > 0 ? (
+      <Heading size="lg" mb={4}>Zarządzanie Użytkownikami (ADMIN CRUD)</Heading>
+      
+      <Button 
+        colorScheme="green" 
+        leftIcon={<FaUserPlus />} 
+        mb={4}
+        onClick={handleOpenCreate}
+      >
+        Dodaj Nowego Użytkownika
+      </Button>
+
+      {userList.length > 0 ? (
         <List spacing={3}>
-          {users.map(email => (
-            <ListItem key={email} p={3} bg="gray.700" borderRadius="md" display="flex" justifyContent="space-between" alignItems="center">
-              <Text>{email}</Text>
-              {users2FA[email]?.enabled ? (
-                <Tag colorScheme="green">2FA Aktywne</Tag>
-              ) : (
-                <Tag colorScheme="yellow">2FA Nieaktywne</Tag>
-              )}
+          {userList.map(user => (
+            <ListItem 
+              key={user.id} 
+              p={3} 
+              bg="gray.700" 
+              borderRadius="md" 
+              display="flex" 
+              flexDirection={{ base: 'column', sm: 'row' }}
+              justifyContent="space-between" 
+              alignItems={{ base: 'flex-start', sm: 'center' }}
+            >
+              <VStack align="flex-start" spacing={1}>
+                <Text fontWeight="bold">{user.email}</Text>
+                <Text fontSize="sm" color="gray.400">{user.name}</Text>
+              </VStack>
+
+              <HStack spacing={3} mt={{ base: 2, sm: 0 }}>
+                {/* ⭐️ Wyświetlanie Roli ⭐️ */}
+                <Tag 
+                    size="sm" 
+                    colorScheme={user.role === 'ADMIN' ? 'red' : 'blue'}
+                >
+                    {user.role}
+                </Tag>
+                {/* Status 2FA - opcjonalny */}
+                {user.twoFactorEnabled ? (
+                    <Tag size="sm" colorScheme="green">2FA Włączone</Tag>
+                ) : (
+                    <Tag size="sm" colorScheme="yellow">Brak 2FA</Tag>
+                )}
+
+                {/* ⭐️ PRZYCISK EDYCJI ⭐️ */}
+                <Button size="sm" leftIcon={<FaEdit />} onClick={() => handleOpenEdit(user)}>
+                    Edytuj
+                </Button>
+                
+                {/* ⭐️ PRZYCISK USUWANIA ⭐️ */}
+                <Button 
+                    size="sm" 
+                    colorScheme="red" 
+                    leftIcon={<FaTrash />} 
+                    onClick={() => handleDelete(user.id)} 
+                    // Zabezpieczenie na froncie
+                    isDisabled={user.email === 'admin'} 
+                >
+                    Usuń
+                </Button>
+              </HStack>
             </ListItem>
           ))}
         </List>
       ) : (
-        <Text color="gray.400">Brak autoryzowanych użytkowników.</Text>
+        <Text color="gray.400">Brak zarejestrowanych użytkowników do zarządzania.</Text>
       )}
+      
+      {/* ⭐️ Komponent Modala ⭐️ */}
+      <UserForm 
+          initialData={editingUser} 
+          isOpen={isModalOpen} 
+          onClose={handleClose} 
+          fetchUsers={fetchUsers} 
+      />
     </Box>
   )
 }
 
-export default UsersPage
+export default UsersPage;

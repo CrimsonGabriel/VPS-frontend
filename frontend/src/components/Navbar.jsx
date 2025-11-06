@@ -1,9 +1,18 @@
+
 import { Box, Flex, Heading, Link, Spacer, Button, Text } from '@chakra-ui/react'
 import { Link as RouterLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext' 
 
 function Navbar() {
-  const { logout } = useAuth();
+  // ⭐️ POBIERAMY userEmail, isAdmin I logout ⭐️
+  const { userEmail, logout, isAdmin } = useAuth();
+
+  // Opcjonalne: Możemy ukryć linki dla ADMINA, jeśli nie ma roli ADMIN
+  const userLink = (
+    <Link as={RouterLink} to="/users" color="blue.300" fontWeight="medium">
+      Użytkownicy
+    </Link>
+  );
 
   return (
     <Box
@@ -22,8 +31,9 @@ function Navbar() {
         
         {/* LEWA STRONA (Status Zalogowania) */}
         <Flex align="center" gap={3}>
+          {/* ⭐️ UŻYCIE POBRANEGO EMAILA ⭐️ */}
           <Text color="white" fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>
-            Witaj, admin
+            Witaj, {userEmail || 'Użytkowniku'}
           </Text>
           <Button colorScheme="red" size="sm" onClick={logout}>
             Wyloguj
@@ -40,13 +50,12 @@ function Navbar() {
           <Link as={RouterLink} to="/status-ip" color="blue.300" fontWeight="medium">
             Status IP
           </Link>
-          <Link as={RouterLink} to="/users" color="blue.300" fontWeight="medium">
-            Użytkownicy
-          </Link>
+          {/* ⭐️ Wyświetlamy link /users tylko dla ADMINA ⭐️ */}
+          {isAdmin && userLink} 
           <Link as={RouterLink} to="/api-test" color="blue.300" fontWeight="medium">
             Test API
           </Link>
-	  <Link as={RouterLink} to="/upload" color="blue.300" fontWeight="medium">
+	      <Link as={RouterLink} to="/upload" color="blue.300" fontWeight="medium">
             Wyślij Plik
           </Link>
           <Link as={RouterLink} to="/files" color="blue.300" fontWeight="medium">

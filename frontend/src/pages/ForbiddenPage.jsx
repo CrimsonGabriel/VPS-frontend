@@ -10,18 +10,16 @@ function ForbiddenPage() {
         403 - Dostęp Zablokowany
       </Heading>
       <Text fontSize="xl" color="gray.300" textAlign="center">
-        Nie masz uprawnień, aby wyświetlić tę stronę.
+        Nie masz **wymaganych uprawnień** (roli) by wyświetlić tę stronę.
       </Text>
       <Text color="gray.400">
-        Musisz być zalogowany, aby uzyskać dostęp.
+        Ta strona wymaga roli Administratora (ADMIN).
       </Text>
       <Flex gap={4} mt={4}>
         <Button as={RouterLink} to="/" colorScheme="gray" variant="outline" size="lg">
           Strona główna
         </Button>
-        <Button as={RouterLink} to="/login" colorScheme="blue" size="lg">
-          Zaloguj się
-        </Button>
+        {/* Usunięto link do /login, bo użytkownik JEST zalogowany, tylko ma za niską rolę */}
       </Flex>
     </VStack>
   );
