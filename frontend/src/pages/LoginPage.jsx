@@ -1,23 +1,23 @@
 import {
   Box, Button, FormControl, FormLabel, Input,
-  VStack, Heading, useToast, Flex
+  VStack, Heading, useToast, Flex, Text // ⭐️ Dodano 'Text'
 } from '@chakra-ui/react';
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext'; // <--- Używamy naszego hooka
+import { useAuth } from '../context/AuthContext';
+import { Link as RouterLink } from 'react-router-dom'; // ⭐️ Dodano import Linka
 
 function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const auth = useAuth(); // <--- Pobieramy funkcję logowania
+  const auth = useAuth();
   const toast = useToast();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Wywołujemy logikę z AuthContext
-    const success = await auth.login(username, password); 
+    const success = await auth.login(username, password);
     
     if (!success) {
       toast({
@@ -28,7 +28,6 @@ function LoginPage() {
         isClosable: true,
       });
     }
-    // Przekierowanie odbywa się w samym AuthContext
     setIsLoading(false);
   };
 
@@ -38,12 +37,12 @@ function LoginPage() {
         <VStack as="form" spacing={4} onSubmit={handleSubmit}>
           <Heading mb={4}>Logowanie</Heading>
           <FormControl isRequired>
-            <FormLabel>Login</FormLabel>
+            <FormLabel>Login (Email)</FormLabel> {/* Zaktualizowałem etykietę */}
             <Input
-              type="text"
+              type="text" // ⭐️ POPRAWKA: Powrót do 'text' aby zezwolić na login 'admin'
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin"
+              placeholder="admin@example.com"
             />
           </FormControl>
           <FormControl isRequired>
@@ -52,7 +51,7 @@ function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="admin"
+              placeholder="••••••••"
             />
           </FormControl>
           <Button
@@ -64,6 +63,16 @@ function LoginPage() {
             Zaloguj
           </Button>
         </VStack>
+
+        {/* ⭐️⭐️ DODANA SEKCJA ⭐️⭐️ */}
+        <Text mt={6} textAlign="center">
+          Nie masz konta?{' '}
+          <Button as={RouterLink} to="/register" colorScheme="blue" variant="link">
+            Zarejestruj się
+          </Button>
+        </Text>
+        {/* ⭐️⭐️ KONIEC SEKCJI ⭐️⭐️ */}
+
       </Box>
     </Flex>
   );
