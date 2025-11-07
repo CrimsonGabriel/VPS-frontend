@@ -123,9 +123,9 @@ export const AuthProvider = ({ children }) => {
             }
 
             const data = await response.json(); 
-            const jwtToken = data.token;
+            const jwtToken = data.jwt; 
 
-            if (!jwtToken) { throw new Error('Nie otrzymano tokena JWT z serwera'); }
+            if (!jwtToken) { throw new Error('Nie otrzymano tokena JWT z serwera (pole "jwt" było puste)'); }
 
             setToken(jwtToken);
             setTokenState(jwtToken); // To odpali ponowne uruchomienie useEffect
