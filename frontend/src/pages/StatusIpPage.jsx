@@ -1,38 +1,29 @@
+// 💾 src/pages/StatusIpPage.jsx (Wersja WYCZYSZCZONA)
+
 import { useState, useEffect } from 'react'
 import {
   Box, Heading, Text, Spinner, Alert, AlertIcon,
-  VStack, List, ListItem, ListIcon, Tag
+  VStack, List, ListItem, ListIcon, Tag,
 } from '@chakra-ui/react'
 import { CheckCircleIcon, WarningIcon } from '@chakra-ui/icons'
-// Importujemy hooka (to już miałeś)
-import { useAuth } from '../context/AuthContext';
+// ❌ Usunięto import useAuth
 
-// URL do Twojego API
-const API_URL = '/status/json'
+const API_URL = '/status/json' // Endpoint publiczny
+// ❌ Usunięto DELETE_HISTORY_URL
 
 function StatusIpPage() {
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  // Pobieramy funkcję do brania tokena (to już miałeś)
-  const { getToken } = useAuth();
+  
+  // ❌ Usunięto stany i hooki admina (useAuth, isDeleting, toast)
 
   const fetchStatus = async () => {
+    setLoading(true); 
     try {
-      // Pobieramy token (to już miałeś)
-	  const token = getToken();
-
-      // === POPRAWKA TUTAJ ===
-      // Dodajemy obiekt 'headers' do zapytania 'fetch'
-      const response = await fetch(API_URL, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      // === KONIEC POPRAWKI ===
+      const response = await fetch(API_URL); 
 
       if (!response.ok) {
-        // Jeśli Spring Boot zwróci 401 lub 403, rzucimy błąd
         throw new Error(`Błąd HTTP: ${response.status} (${response.statusText})`)
       }
       const data = await response.json()
@@ -45,6 +36,8 @@ function StatusIpPage() {
       setLoading(false)
     }
   }
+  
+  // ❌ Usunięto funkcję handleDeleteHistory
 
   
   useEffect(() => {
@@ -75,7 +68,7 @@ function StatusIpPage() {
       <Box p={5} shadow="md" borderWidth="1px" borderRadius="md" bg="gray.800">
         <Heading size="lg" mb={3}>Status Połączeń</Heading>
         <Text fontSize="lg">
-          Ostatni meldunek: <Tag colorScheme="cyan">{status.lastReportText}</Tag>
+          Ostatni meldunek: <Tag colorScheme="cyan">{status.lastReportText || "Brak"}</Tag>
         </Text>
       </Box>
 
@@ -84,7 +77,7 @@ function StatusIpPage() {
         {status.registeredRPiIp && !status.registeredRPiIp.startsWith('Brak') ? (
           <Text fontSize="lg"><CheckCircleIcon color="green.500" mr={2} /> {status.registeredRPiIp}</Text>
         ) : (
-          <Text fontSize="lg"><WarningIcon color="red.500" mr={2} /> Brak IP RPi</Text>
+          <Text fontSize="lg"><WarningIcon color="red.500" mr={2} /> {status.registeredRPiIp || "Brak IP RPi"}</Text>
         )}
       </Box>
 
@@ -103,6 +96,9 @@ function StatusIpPage() {
           <Text color="gray.400">Brak zarejestrowanych adresów IP Androida.</Text>
         )}
       </Box>
+
+      {/* ❌ Usunięto sekcję {isAdmin && (...)} */}
+
     </VStack>
   )
 }

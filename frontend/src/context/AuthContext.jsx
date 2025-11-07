@@ -1,4 +1,4 @@
-// 💾 src/context/AuthContext.jsx (OSTATECZNA POPRAWKA SKANUJĄCA CAŁY PAYLOAD)
+// 💾 src/context/AuthContext.jsx (OSTATECZNA POPRAWIONA WERSJA)
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -10,7 +10,8 @@ const getToken = () => localStorage.getItem(TOKEN_STORAGE_KEY);
 const setToken = (token) => localStorage.setItem(TOKEN_STORAGE_KEY, token);
 const removeToken = () => localStorage.removeItem(TOKEN_STORAGE_KEY);
 
-// --- FUNKCJA POMOCNICZA DO DEKODOWANIA JWT ---
+// --- FUNKCJA POMOCNICZA DO DEKODOWANIA JWT (BEZ ZMIAN) ---
+// Ta funkcja jest poprawna, dekoduje Base64URL niezależnie od algorytmu podpisu.
 const decodeJwt = (jwtToken) => {
     try {
         const base64Url = jwtToken.split('.')[1];
@@ -35,89 +36,77 @@ export const AuthProvider = ({ children }) => {
     
     const navigate = useNavigate();
     
+    // Funkcja wylogowania, używana teraz także przy wygaśnięciu tokena
+    const logout = () => {
+        removeToken();
+        setTokenState(null);
+        setIsAuthenticated(false);
+        setUserRole(null);
+        setUserEmail(null);
+        navigate('/');
+    };
+
     useEffect(() => {
         setLoading(true);
         const currentToken = getToken();
 
         if (currentToken) {
             const decodedPayload = decodeJwt(currentToken);
+            
             if (decodedPayload) {
                 
-                let roleFromToken = null;
+                // Sprawdzamy, czy token nie wygasł (ta logika jest poprawna i zostaje)
+                if (decodedPayload.exp * 1000 < Date.now()) {
+                    console.warn("Token JWT wygasł. Automatyczne wylogowywanie...");
+                    logout(); 
+                    setLoading(false); 
+                    return; 
+                }
+
+                // ⭐️⭐️⭐️ POCZĄTEK KLUCZOWEJ POPRAWKI ⭐️⭐️⭐️
+                // 
+                // Usuwamy "agresywne skanowanie" ról. 
+                // Ufamy TYLKO polu "role", które jest wysyłane przez JwtService.
+                //
                 
-                // 1. Sprawdź standardowe pola Spring (role, authorities)
-                roleFromToken = decodedPayload.role || decodedPayload.authorities;
+                let roleFromToken = decodedPayload.role; // np. "ADMIN" lub "USER"
+                let finalRole = 'ROLE_USER'; // Domyślna rola, jeśli coś pójdzie nie tak
 
-                // 2. Jeśli standardowe pole jest puste lub tablica jest pusta, 
-                //    wykonaj agresywne skanowanie całego ładunku.
-                if (!roleFromToken || (Array.isArray(roleFromToken) && roleFromToken.length === 0)) {
+                if (typeof roleFromToken === 'string') {
+                    // Normalizujemy dla pewności (np. jeśli backend wysłał "ROLE_ADMIN")
+                    let normalized = roleFromToken.toUpperCase().replace('ROLE_', '');
                     
-                    // ⭐️ AGRESYWNE SKANOWANIE CAŁEGO PAYLOADU ⭐️
-                    for (const key in decodedPayload) {
-                        const value = decodedPayload[key];
-                        
-                        // Skanowanie wartości typu string
-                        if (typeof value === 'string' && (value.toUpperCase().includes('ADMIN') || value.toUpperCase().includes('USER'))) {
-                            roleFromToken = value;
-                            break; 
-                        } 
-                        // Skanowanie tablic (np. list ról)
-                        else if (Array.isArray(value)) {
-                            const foundRole = value.find(item => 
-                                (typeof item === 'string' && (item.toUpperCase().includes('ADMIN') || item.toUpperCase().includes('USER'))) ||
-                                (item && item.authority && (item.authority.toUpperCase().includes('ADMIN') || item.authority.toUpperCase().includes('USER')))
-                            );
-                            if (foundRole) {
-                                roleFromToken = (typeof foundRole === 'string') ? foundRole : foundRole.authority;
-                                break;
-                            }
-                        }
-                    }
-                    // --------------------------------------------------
-                }
-
-                // 3. Normalizacja i ujednolicenie
-                let finalRole = 'ROLE_USER'; 
-
-                if (roleFromToken) {
-                    // Jeśli nadal jest tablicą, ujednolicamy ją do pierwszego elementu stringa/authority
-                    if (Array.isArray(roleFromToken)) {
-                        if (roleFromToken.length > 0) {
-                            roleFromToken = (typeof roleFromToken[0] === 'string') ? roleFromToken[0] : roleFromToken[0].authority;
-                        }
-                    }
-
-                    if (typeof roleFromToken === 'string') {
-                        // Usuń ROLE_, przekształć na duże litery, aby znormalizować
-                        let normalized = roleFromToken.toUpperCase().replace('ROLE_', '');
-                        if (normalized.includes('ADMIN')) {
-                            finalRole = 'ROLE_ADMIN';
-                        } else if (normalized.includes('USER')) {
-                            finalRole = 'ROLE_USER';
-                        }
+                    if (normalized.includes('ADMIN')) {
+                        finalRole = 'ROLE_ADMIN';
+                    } else if (normalized.includes('USER')) {
+                        finalRole = 'ROLE_USER';
                     }
                 }
+                
+                // ⭐️⭐️⭐️ KONIEC KLUCZOWEJ POPRAWKI ⭐️⭐️⭐️
                 
                 setUserRole(finalRole);
                 setUserEmail(decodedPayload.sub || decodedPayload.email);
                 setIsAuthenticated(true);
 
             } else {
+                // Token był w localStorage, ale nie dało się go zdekodować
                 logout(); 
             }
         } else {
+            // Brak tokena w localStorage
             setIsAuthenticated(false);
             setUserRole(null);
             setUserEmail(null);
         }
         setLoading(false);
-    }, [token]);
+    }, [token, navigate]); // Dodano 'navigate' do zależności
 
 
     const login = async (username, password) => {
         
         const payload = JSON.stringify({ email: username, password: password });
-        console.log('Payload wysyłany do Springa:', payload); // Debugowanie
+        console.log('Payload wysyłany do Springa:', payload); 
         
         try {
             const response = await fetch('/api/auth/login', { 
@@ -139,7 +128,7 @@ export const AuthProvider = ({ children }) => {
             if (!jwtToken) { throw new Error('Nie otrzymano tokena JWT z serwera'); }
 
             setToken(jwtToken);
-            setTokenState(jwtToken);
+            setTokenState(jwtToken); // To odpali ponowne uruchomienie useEffect
             
             console.log('Logowanie pomyślne, zapisano JWT.');
             navigate('/'); 
@@ -154,15 +143,9 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const logout = () => {
-        removeToken();
-        setTokenState(null);
-        setIsAuthenticated(false);
-        setUserRole(null);
-        setUserEmail(null);
-        navigate('/');
-    };
-    
+    // Przeniosłem definicję 'logout' wyżej, aby była dostępna w useEffect
+
+    // Ta logika jest teraz poprawna, bo 'userRole' jest ustawiane wiarygodnie
     const isAdmin = userRole && userRole.toUpperCase().includes('ADMIN');
 
     const value = {
@@ -176,8 +159,9 @@ export const AuthProvider = ({ children }) => {
         getToken,
     };
     
+    // Zmieniono na prosty spinner lub null, aby uniknąć migotania
     if (loading) {
-        return <div>Weryfikacja sesji...</div>; 
+        return null; 
     }
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

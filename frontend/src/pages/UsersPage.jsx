@@ -1,4 +1,4 @@
-// 💾 src/pages/UsersPage.jsx (POPRAWKA SYNCHRONIZACJI I 401)
+// 💾 src/pages/UsersPage.jsx (Z DODANĄ SEKCJĄ ADMINA)
 
 import { useState, useEffect } from 'react';
 import {
@@ -10,13 +10,15 @@ import {
 } from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
 import { FaEdit, FaTrash, FaUserPlus } from 'react-icons/fa'; // Import ikon
+import { WarningIcon } from '@chakra-ui/icons'; // ⭐️ DODANY IMPORT DLA NOWEGO PRZYCISKU
 
-// ⭐️ Endpoint panelu ADMINA ⭐️
+// Endpoint panelu ADMINA
 const API_URL = '/api/admin/users';
+// ⭐️ DODANY ENDPOINT USUWANIA HISTORII ⭐️
+const DELETE_HISTORY_URL = '/api/data/history/delete';
 
 // --- Komponent Formularza (Dodawanie/Edytowanie) ---
-// BEZ ZMIAN W KOMPONENCIE UserForm
-
+// (Ten komponent pozostaje BEZ ZMIAN)
 const UserForm = ({ initialData, isOpen, onClose, fetchUsers }) => {
     const toast = useToast();
     const { getToken } = useAuth();
@@ -199,19 +201,20 @@ function UsersPage() {
   // Stany dla Modala
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
+  
+  // ⭐️ DODANY STAN DLA USUWANIA HISTORII ⭐️
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // ⭐️ POPRAWKA: POBIERAMY RÓWNIEŻ STANY AUTHENTYKACJI ⭐️
-  const { getToken, isAuthenticated, loading: authLoading, logout } = useAuth();
+  // ⭐️ POPRAWKA: Pobieramy 'isAdmin' (dla przycisku) i dodajemy 'toast'
+  const { getToken, isAuthenticated, loading: authLoading, logout, isAdmin } = useAuth();
   const toast = useToast();
 
   const fetchUsers = async () => {
-    setLoading(true); // Ustawiamy loading na true na początku
+    setLoading(true); 
     try {
       const token = getToken();
       
-      // Choć ProtectedRoute powinien to wyłapać, ten check jest backupem
       if (!token) {
-        // Zamiast ustawiać error, robimy logout (co przeniesie do /login)
         logout(); 
         return;
       }
@@ -233,7 +236,6 @@ function UsersPage() {
       
       if (!response.ok) {
         const errorText = await response.text();
-        // Próbujemy parsować JSON dla czytelniejszego błędu
         let errorMsg = `Błąd HTTP: ${response.status}.`;
         try {
             const errorJson = JSON.parse(errorText);
@@ -315,20 +317,59 @@ function UsersPage() {
         });
     }
   };
+  
+  // ⭐️ DODANA FUNKCJA USUWANIA HISTORII (przeniesiona ze StatusIpPage) ⭐️
+  const handleDeleteHistory = async () => {
+    if (!window.confirm("Czy na pewno chcesz usunąć CAŁĄ historię czujników z serwera? Tej akcji nie można cofnąć.")) {
+        return;
+    }
+
+    setIsDeleting(true);
+    const token = getToken(); // Używamy funkcji z Twojego AuthContext
+
+    try {
+        const response = await fetch(DELETE_HISTORY_URL, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `Błąd serwera: ${response.status}`);
+        }
+
+        toast({
+            title: "Sukces!",
+            description: "Historia czujników została pomyślnie usunięta.",
+            status: "success",
+            duration: 5000,
+            isClosable: true,
+        });
+
+    } catch (error) {
+        toast({
+            title: "Błąd podczas usuwania",
+            description: `Wystąpił błąd: ${error.message}`,
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+        });
+    } finally {
+        setIsDeleting(false);
+    }
+  };
 
 
   useEffect(() => {
-    // ⭐️ NOWA LOGIKA: Wywołaj fetchUsers tylko, gdy kontekst jest załadowany i uwierzytelniony ⭐️
     if (!authLoading && isAuthenticated) {
         fetchUsers()
     } else if (!authLoading && !isAuthenticated) {
-        // Jeśli ładowanie się skończyło, ale nie jesteśmy uwierzytelnieni (choć ProtectedRoute nas tu nie wpuścił),
-        // to ustawiamy loading na false, aby widzieć error.
         setLoading(false);
     }
-  }, [isAuthenticated, authLoading]); // Zależności od stanu AuthContext
+  }, [isAuthenticated, authLoading]); 
 
-  // ⭐️ DODAJEMY SPRAWDZANIE ŁADOWANIA KONTEKSTU ⭐️
   if (authLoading) {
       return <div>Weryfikacja kontekstu...</div>;
   }
@@ -380,32 +421,25 @@ function UsersPage() {
               </VStack>
 
               <HStack spacing={3} mt={{ base: 2, sm: 0 }}>
-                {/* ⭐️ Wyświetlanie Roli ⭐️ */}
                 <Tag 
                     size="sm" 
                     colorScheme={user.role === 'ADMIN' ? 'red' : 'blue'}
                 >
                     {user.role}
                 </Tag>
-                {/* Status 2FA - opcjonalny */}
                 {user.twoFactorEnabled ? (
                     <Tag size="sm" colorScheme="green">2FA Włączone</Tag>
                 ) : (
                     <Tag size="sm" colorScheme="yellow">Brak 2FA</Tag>
                 )}
-
-                {/* ⭐️ PRZYCISK EDYCJI ⭐️ */}
                 <Button size="sm" leftIcon={<FaEdit />} onClick={() => handleOpenEdit(user)}>
                     Edytuj
                 </Button>
-                
-                {/* ⭐️ PRZYCISK USUWANIA ⭐️ */}
                 <Button 
                     size="sm" 
                     colorScheme="red" 
                     leftIcon={<FaTrash />} 
                     onClick={() => handleDelete(user.id)} 
-                    // Zabezpieczenie na froncie
                     isDisabled={user.email === 'admin'} 
                 >
                     Usuń
@@ -418,7 +452,23 @@ function UsersPage() {
         <Text color="gray.400">Brak zarejestrowanych użytkowników do zarządzania.</Text>
       )}
       
-      {/* ⭐️ Komponent Modala ⭐️ */}
+      {/* ⭐️ DODANA SEKCJA ADMINA (przeniesiona ze StatusIpPage) ⭐️ */}
+      {isAdmin && (
+        <Box mt={8} p={5} shadow="md" borderWidth="1px" borderRadius="md" bg="gray.900" borderColor="red.500">
+            <Heading size="md" mb={3} color="red.300">Inne Akcje Administracyjne</Heading>
+            <Text mb={4}>Ta akcja jest nieodwracalna i usunie wszystkie dane czujników z bazy danych VPS.</Text>
+            <Button
+                colorScheme="red"
+                isLoading={isDeleting}
+                onClick={handleDeleteHistory}
+                leftIcon={<WarningIcon />}
+            >
+                Usuń całą historię czujników z VPS
+            </Button>
+        </Box>
+      )}
+
+      {/* Komponent Modala (poza głównym Boxem) */}
       <UserForm 
           initialData={editingUser} 
           isOpen={isModalOpen} 
