@@ -50,6 +50,10 @@ function Navbar() {
           <Link as={RouterLink} to="/status-ip" color="blue.300" fontWeight="medium">
             Status IP
           </Link>
+		  {/* ⭐️ DODANY LINK DO KONTA ⭐️ */}
+          <Link as={RouterLink} to="/konto" color="blue.300" fontWeight="medium">
+            Moje Konto
+          </Link>
           {/* ⭐️ Wyświetlamy link /users tylko dla ADMINA ⭐️ */}
           {isAdmin && userLink} 
           <Link as={RouterLink} to="/api-test" color="blue.300" fontWeight="medium">

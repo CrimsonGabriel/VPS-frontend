@@ -12,7 +12,7 @@ import GlobalLayout from './components/GlobalLayout';
 import ForbiddenPage from './pages/ForbiddenPage';
 import FileUploadPage from './pages/FileUploadPage.jsx';
 import FileListPage from './pages/FileListPage.jsx';
-
+import AccountPage from './pages/AccountPage.jsx';
 
 function App() {
   return (
@@ -30,6 +30,7 @@ function App() {
           <Route path="/api-test" element={<ApiTestPage />} />
 	  <Route path="/upload" element={<FileUploadPage />} />
     	  <Route path="/files" element={<FileListPage />} />
+		  <Route path="/konto" element={<AccountPage />} />
         </Route>
         
         {/* 2. TRASY CHRONIONE DLA ADMINA (Wymagany Token I Rola ADMIN) */}
