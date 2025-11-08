@@ -13,7 +13,7 @@ import ForbiddenPage from './pages/ForbiddenPage';
 import FileUploadPage from './pages/FileUploadPage.jsx';
 import FileListPage from './pages/FileListPage.jsx';
 import AccountPage from './pages/AccountPage.jsx';
-
+import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 function App() {
   return (
     <Routes>
@@ -22,7 +22,8 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-	<Route path="/forbidden" element={<ForbiddenPage />} />
+		<Route path="/reset-password" element={<ResetPasswordPage />} />
+		<Route path="/forbidden" element={<ForbiddenPage />} />
 
         {/* 1. TRASY CHRONIONE (Wymagany Token - Rola USER lub ADMIN) */}
         <Route element={<ProtectedRoute />}>
