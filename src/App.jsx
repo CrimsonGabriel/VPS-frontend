@@ -1,3 +1,5 @@
+// 💾 src/App.jsx (ZAKTUALIZOWANA WERSJA)
+
 import { Routes, Route } from 'react-router-dom';
 
 // Import komponentów
@@ -14,6 +16,9 @@ import FileUploadPage from './pages/FileUploadPage.jsx';
 import FileListPage from './pages/FileListPage.jsx';
 import AccountPage from './pages/AccountPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
+// 👇 1. NOWA LINIA (IMPORT)
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage'; 
+
 function App() {
   return (
     <Routes>
@@ -24,6 +29,8 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
 		<Route path="/reset-password" element={<ResetPasswordPage />} />
 		<Route path="/forbidden" element={<ForbiddenPage />} />
+        {/* 👇 2. NOWA LINIA (TRASA) */}
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
 
         {/* 1. TRASY CHRONIONE (Wymagany Token - Rola USER lub ADMIN) */}
         <Route element={<ProtectedRoute />}>
