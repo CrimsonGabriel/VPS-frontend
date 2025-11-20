@@ -18,6 +18,7 @@ import AccountPage from './pages/AccountPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import LogsPage from './pages/LogsPage';
+import UpdatesPage from './pages/UpdatesPage';
 
 function App() {
   return (
@@ -47,7 +48,8 @@ function App() {
           {/* Użytkownicy - panel CRUD */}
           <Route path="/users" element={<UsersPage />} /> 
 		  <Route path="/logs" element={<LogsPage />} /> {/* <--- Nowa trasa */}
-        </Route>
+		  <Route path="/updates" element={<UpdatesPage />} />
+		</Route>
 
         {/* Catch-all route */}
         <Route path="*" element={<div>404 - Nie znaleziono</div>} />

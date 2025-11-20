@@ -1,4 +1,4 @@
-// 💾 src/context/AuthContext.jsx (OSTATECZNA POPRAWIONA WERSJA)
+// 💾 src/context/AuthContext.jsx
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -6,12 +6,21 @@ import { useNavigate } from 'react-router-dom';
 const AuthContext = createContext(null);
 
 const TOKEN_STORAGE_KEY = 'jwtToken'; 
-const getToken = () => localStorage.getItem(TOKEN_STORAGE_KEY);
+
+// ⭐️⭐️⭐️ FIX: Ignorujemy "null" jako tekst ⭐️⭐️⭐️
+const getToken = () => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    // Jeśli w pamięci siedzi napis "null" albo "undefined", traktuj to jak brak tokena
+    if (token === 'null' || token === 'undefined') {
+        return null;
+    }
+    return token;
+};
+
 const setToken = (token) => localStorage.setItem(TOKEN_STORAGE_KEY, token);
 const removeToken = () => localStorage.removeItem(TOKEN_STORAGE_KEY);
 
-// --- FUNKCJA POMOCNICZA DO DEKODOWANIA JWT (BEZ ZMIAN) ---
-// Ta funkcja jest poprawna, dekoduje Base64URL niezależnie od algorytmu podpisu.
+// --- FUNKCJA POMOCNICZA DO DEKODOWANIA JWT ---
 const decodeJwt = (jwtToken) => {
     try {
         const base64Url = jwtToken.split('.')[1];
@@ -36,7 +45,6 @@ export const AuthProvider = ({ children }) => {
     
     const navigate = useNavigate();
     
-    // Funkcja wylogowania, używana teraz także przy wygaśnięciu tokena
     const logout = () => {
         removeToken();
         setTokenState(null);
@@ -48,14 +56,13 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         setLoading(true);
-        const currentToken = getToken();
+        const currentToken = getToken(); // Tu teraz zadziała nasz fix
 
         if (currentToken) {
             const decodedPayload = decodeJwt(currentToken);
             
             if (decodedPayload) {
-                
-                // Sprawdzamy, czy token nie wygasł (ta logika jest poprawna i zostaje)
+                // Sprawdzamy wygaśnięcie
                 if (decodedPayload.exp * 1000 < Date.now()) {
                     console.warn("Token JWT wygasł. Automatyczne wylogowywanie...");
                     logout(); 
@@ -63,19 +70,12 @@ export const AuthProvider = ({ children }) => {
                     return; 
                 }
 
-                // ⭐️⭐️⭐️ POCZĄTEK KLUCZOWEJ POPRAWKI ⭐️⭐️⭐️
-                // 
-                // Usuwamy "agresywne skanowanie" ról. 
-                // Ufamy TYLKO polu "role", które jest wysyłane przez JwtService.
-                //
-                
-                let roleFromToken = decodedPayload.role; // np. "ADMIN" lub "USER"
-                let finalRole = 'ROLE_USER'; // Domyślna rola, jeśli coś pójdzie nie tak
+                // Logika ról (zgodna z Twoim kodem)
+                let roleFromToken = decodedPayload.role; 
+                let finalRole = 'ROLE_USER'; 
 
                 if (typeof roleFromToken === 'string') {
-                    // Normalizujemy dla pewności (np. jeśli backend wysłał "ROLE_ADMIN")
                     let normalized = roleFromToken.toUpperCase().replace('ROLE_', '');
-                    
                     if (normalized.includes('ADMIN')) {
                         finalRole = 'ROLE_ADMIN';
                     } else if (normalized.includes('USER')) {
@@ -83,37 +83,28 @@ export const AuthProvider = ({ children }) => {
                     }
                 }
                 
-                // ⭐️⭐️⭐️ KONIEC KLUCZOWEJ POPRAWKI ⭐️⭐️⭐️
-                
                 setUserRole(finalRole);
                 setUserEmail(decodedPayload.sub || decodedPayload.email);
                 setIsAuthenticated(true);
 
             } else {
-                // Token był w localStorage, ale nie dało się go zdekodować
                 logout(); 
             }
         } else {
-            // Brak tokena w localStorage
             setIsAuthenticated(false);
             setUserRole(null);
             setUserEmail(null);
         }
         setLoading(false);
-    }, [token, navigate]); // Dodano 'navigate' do zależności
-
+    }, [token, navigate]); 
 
     const login = async (username, password) => {
-        
         const payload = JSON.stringify({ email: username, password: password });
-        console.log('Payload wysyłany do Springa:', payload); 
         
         try {
             const response = await fetch('/api/auth/login', { 
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: payload 
             });
 
@@ -125,12 +116,12 @@ export const AuthProvider = ({ children }) => {
             const data = await response.json(); 
             const jwtToken = data.jwt; 
 
-            if (!jwtToken) { throw new Error('Nie otrzymano tokena JWT z serwera (pole "jwt" było puste)'); }
+            if (!jwtToken) { throw new Error('Brak tokena JWT w odpowiedzi'); }
 
             setToken(jwtToken);
-            setTokenState(jwtToken); // To odpali ponowne uruchomienie useEffect
+            setTokenState(jwtToken);
             
-            console.log('Logowanie pomyślne, zapisano JWT.');
+            console.log('Logowanie pomyślne.');
             navigate('/'); 
             return true;
 
@@ -143,9 +134,6 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Przeniosłem definicję 'logout' wyżej, aby była dostępna w useEffect
-
-    // Ta logika jest teraz poprawna, bo 'userRole' jest ustawiane wiarygodnie
     const isAdmin = userRole && userRole.toUpperCase().includes('ADMIN');
 
     const value = {
@@ -157,9 +145,9 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         getToken,
+        token // Eksportujemy token, żeby był dostępny w hooku useAuth()
     };
     
-    // Zmieniono na prosty spinner lub null, aby uniknąć migotania
     if (loading) {
         return null; 
     }

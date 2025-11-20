@@ -54,6 +54,9 @@ function Navbar() {
               <Link as={RouterLink} to="/logs" color="orange.300" fontWeight="bold">
                 Logi Serwera
               </Link>
+			  <Link as={RouterLink} to="/updates" color="orange.300" fontWeight="bold">
+                Aktualizacje
+              </Link>
             </>
           )}
 
