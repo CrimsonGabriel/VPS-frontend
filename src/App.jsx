@@ -16,8 +16,8 @@ import FileUploadPage from './pages/FileUploadPage.jsx';
 import FileListPage from './pages/FileListPage.jsx';
 import AccountPage from './pages/AccountPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
-// 👇 1. NOWA LINIA (IMPORT)
-import PrivacyPolicyPage from './pages/PrivacyPolicyPage'; 
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import LogsPage from './pages/LogsPage';
 
 function App() {
   return (
@@ -46,6 +46,7 @@ function App() {
         <Route element={<ProtectedRoute requiredRole="ROLE_ADMIN" />}>
           {/* Użytkownicy - panel CRUD */}
           <Route path="/users" element={<UsersPage />} /> 
+		  <Route path="/logs" element={<LogsPage />} /> {/* <--- Nowa trasa */}
         </Route>
 
         {/* Catch-all route */}

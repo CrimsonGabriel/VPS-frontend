@@ -1,33 +1,31 @@
-// 💾 src/pages/UsersPage.jsx (Z DODANĄ SEKCJĄ ADMINA)
+// 💾 src/pages/UsersPage.jsx
 
 import { useState, useEffect } from 'react';
 import {
   Box, Heading, Text, Spinner, Alert, AlertIcon,
   VStack, List, ListItem, Tag, Button, HStack, useToast,
-  // Nowe komponenty dla CRUD:
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter,
-  ModalCloseButton, FormControl, FormLabel, Input, Checkbox
+  ModalCloseButton, FormControl, FormLabel, Input, Checkbox, Icon
 } from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
-import { FaEdit, FaTrash, FaUserPlus } from 'react-icons/fa'; // Import ikon
-import { WarningIcon } from '@chakra-ui/icons'; // ⭐️ DODANY IMPORT DLA NOWEGO PRZYCISKU
+import { FaEdit, FaTrash, FaUserPlus, FaLock, FaUnlock } from 'react-icons/fa';
+import { WarningIcon } from '@chakra-ui/icons';
 
-// Endpoint panelu ADMINA
+// Endpointy
 const API_URL = '/api/admin/users';
-// ⭐️ DODANY ENDPOINT USUWANIA HISTORII ⭐️
 const DELETE_HISTORY_URL = '/api/data/history/delete';
 
 // --- Komponent Formularza (Dodawanie/Edytowanie) ---
-// (Ten komponent pozostaje BEZ ZMIAN)
 const UserForm = ({ initialData, isOpen, onClose, fetchUsers }) => {
     const toast = useToast();
     const { getToken } = useAuth();
     
     const [formData, setFormData] = useState({
-        email: initialData?.email || '',
-        name: initialData?.name || '',
+        email: '',
+        name: '',
         password: '', 
-        isAdmin: initialData?.role === 'ADMIN' || false,
+        isAdmin: false,
+        enabled: true // Domyślnie nowe konto jest aktywne
     });
     const [loading, setLoading] = useState(false);
 
@@ -38,9 +36,12 @@ const UserForm = ({ initialData, isOpen, onClose, fetchUsers }) => {
                 name: initialData.name || '',
                 password: '',
                 isAdmin: initialData.role === 'ADMIN' || false,
+                // Jeśli backend nie zwróci pola enabled, zakładamy true
+                enabled: initialData.enabled !== undefined ? initialData.enabled : true,
             });
         } else {
-            setFormData({ email: '', name: '', password: '', isAdmin: false });
+            // Reset formularza dla nowego usera
+            setFormData({ email: '', name: '', password: '', isAdmin: false, enabled: true });
         }
     }, [initialData]);
 
@@ -57,30 +58,15 @@ const UserForm = ({ initialData, isOpen, onClose, fetchUsers }) => {
         setLoading(true);
         const token = getToken();
 
+        // Walidacja
         if (!initialData && !formData.password) {
-            toast({
-                title: 'Błąd walidacji',
-                description: 'Hasło jest wymagane przy tworzeniu nowego użytkownika.',
-                status: 'warning',
-                duration: 5000,
-                isClosable: true,
-            });
-            setLoading(false);
-            return;
+            toast({ title: 'Błąd', description: 'Hasło wymagane', status: 'warning' });
+            setLoading(false); return;
         }
-
         if (!formData.email) {
-            toast({
-                title: 'Błąd walidacji',
-                description: 'Email jest wymagany.',
-                status: 'warning',
-                duration: 5000,
-                isClosable: true,
-            });
-            setLoading(false);
-            return;
+            toast({ title: 'Błąd', description: 'Email wymagany', status: 'warning' });
+            setLoading(false); return;
         }
-
 
         const method = initialData ? 'PUT' : 'POST';
         const url = initialData ? `${API_URL}/${initialData.id}` : API_URL;
@@ -96,13 +82,13 @@ const UserForm = ({ initialData, isOpen, onClose, fetchUsers }) => {
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Błąd HTTP: ${response.status}. Odpowiedź: ${errorText}`);
+                const text = await response.text();
+                throw new Error(text || `Błąd HTTP: ${response.status}`);
             }
 
             toast({
-                title: initialData ? 'Edycja pomyślna' : 'Utworzenie pomyślne',
-                description: `Użytkownik ${formData.email} został zapisany.`,
+                title: 'Sukces',
+                description: `Użytkownik ${formData.email} zapisany.`,
                 status: 'success',
                 duration: 3000,
                 isClosable: true,
@@ -112,18 +98,11 @@ const UserForm = ({ initialData, isOpen, onClose, fetchUsers }) => {
             onClose(); 
 
         } catch (err) {
-            toast({
-                title: 'Błąd operacji',
-                description: err.message,
-                status: 'error',
-                duration: 5000,
-                isClosable: true,
-            });
+            toast({ title: 'Błąd operacji', description: err.message, status: 'error' });
         } finally {
             setLoading(false);
         }
     };
-
 
     return (
         <Modal isOpen={isOpen} onClose={onClose}>
@@ -135,34 +114,38 @@ const UserForm = ({ initialData, isOpen, onClose, fetchUsers }) => {
                     <ModalBody pb={6}>
                         <FormControl isRequired>
                             <FormLabel>Email</FormLabel>
-                            <Input 
-                                placeholder="E-mail" 
-                                name="email" 
-                                value={formData.email} 
-                                onChange={handleChange} 
-                                isDisabled={!!initialData} 
-                            />
+                            <Input name="email" value={formData.email} onChange={handleChange} isDisabled={!!initialData} />
                         </FormControl>
 
                         <FormControl mt={4}>
                             <FormLabel>Imię/Nazwa</FormLabel>
-                            <Input 
-                                placeholder="Imię lub Nickname" 
-                                name="name" 
-                                value={formData.name} 
-                                onChange={handleChange} 
-                            />
+                            <Input name="name" value={formData.name} onChange={handleChange} />
                         </FormControl>
 
                         <FormControl mt={4} isRequired={!initialData}>
                             <FormLabel>Hasło</FormLabel>
                             <Input 
-                                placeholder={initialData ? 'Zostaw puste, aby nie zmieniać' : 'Wpisz hasło'}
                                 type="password" 
                                 name="password" 
                                 value={formData.password} 
                                 onChange={handleChange} 
+                                placeholder={initialData ? 'Zostaw puste, aby nie zmieniać' : ''}
                             />
+                        </FormControl>
+
+                        {/* ⭐️ Checkbox: Blokada konta ⭐️ */}
+                        <FormControl mt={6} p={3} borderWidth="1px" borderRadius="md" borderColor={formData.enabled ? "green.500" : "red.500"}>
+                            <Checkbox 
+                                name="enabled" 
+                                isChecked={formData.enabled} 
+                                onChange={handleChange}
+                                colorScheme="green"
+                                size="lg"
+                            >
+                                <Text fontWeight="bold" ml={2}>
+                                    {formData.enabled ? "Konto Aktywne (Może się logować)" : "Konto ZABLOKOWANE"}
+                                </Text>
+                            </Checkbox>
                         </FormControl>
 
                         <FormControl mt={4}>
@@ -170,19 +153,16 @@ const UserForm = ({ initialData, isOpen, onClose, fetchUsers }) => {
                                 name="isAdmin" 
                                 isChecked={formData.isAdmin} 
                                 onChange={handleChange}
-                                colorScheme="red"
+                                colorScheme="purple"
                                 isDisabled={initialData?.email === 'admin'} 
                             >
-                                Użytkownik jest administratorem (ADMIN)
+                                Rola Administratora (ADMIN)
                             </Checkbox>
                         </FormControl>
-                        
                     </ModalBody>
 
                     <ModalFooter>
-                        <Button colorScheme="blue" mr={3} type="submit" isLoading={loading}>
-                            {initialData ? 'Zapisz zmiany' : 'Dodaj'}
-                        </Button>
+                        <Button colorScheme="blue" mr={3} type="submit" isLoading={loading}>Zapisz</Button>
                         <Button onClick={onClose}>Anuluj</Button>
                     </ModalFooter>
                 </form>
@@ -190,7 +170,6 @@ const UserForm = ({ initialData, isOpen, onClose, fetchUsers }) => {
         </Modal>
     );
 };
-// --- Koniec Komponentu Formularza ---
 
 
 function UsersPage() {
@@ -198,14 +177,13 @@ function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
-  // Stany dla Modala
+  // Stany Modala
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   
-  // ⭐️ DODANY STAN DLA USUWANIA HISTORII ⭐️
-  const [isDeleting, setIsDeleting] = useState(false);
+  // Stan usuwania historii
+  const [isDeletingHistory, setIsDeletingHistory] = useState(false);
 
-  // ⭐️ POPRAWKA: Pobieramy 'isAdmin' (dla przycisku) i dodajemy 'toast'
   const { getToken, isAuthenticated, loading: authLoading, logout, isAdmin } = useAuth();
   const toast = useToast();
 
@@ -213,43 +191,17 @@ function UsersPage() {
     setLoading(true); 
     try {
       const token = getToken();
-      
-      if (!token) {
-        logout(); 
-        return;
-      }
+      if (!token) { logout(); return; }
       
       const response = await fetch(API_URL, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      
-      if (response.status === 401) {
-          throw new Error("Błąd 401: Sesja wygasła. Proszę zalogować się ponownie.");
-      }
-      
-      if (response.status === 403) {
-        throw new Error("Brak uprawnień. Tylko użytkownik z rolą ADMIN ma dostęp. (Error 403)");
-      }
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMsg = `Błąd HTTP: ${response.status}.`;
-        try {
-            const errorJson = JSON.parse(errorText);
-            errorMsg += ` Odpowiedź: ${errorJson.message || errorJson.error || errorText}`;
-        } catch (e) {
-            errorMsg += ` Odpowiedź: ${errorText}`;
-        }
-        throw new Error(errorMsg);
-      }
+      if (!response.ok) throw new Error(`Błąd pobierania: ${response.status}`);
       
       const data = await response.json()
       setUsers(data)
       setError(null)
-
     } catch (err) {
       setError(err.message)
     } finally {
@@ -257,187 +209,108 @@ function UsersPage() {
     }
   }
 
-  // Użycie: Otwiera modal w trybie edycji
-  const handleOpenEdit = (user) => {
-    setEditingUser(user);
-    setIsModalOpen(true);
-  };
+  const handleOpenEdit = (user) => { setEditingUser(user); setIsModalOpen(true); };
+  const handleOpenCreate = () => { setEditingUser(null); setIsModalOpen(true); };
+  const handleClose = () => { setIsModalOpen(false); setEditingUser(null); };
 
-  // Użycie: Otwiera modal w trybie dodawania
-  const handleOpenCreate = () => {
-    setEditingUser(null);
-    setIsModalOpen(true);
-  };
-
-  // Użycie: Zamyka modal
-  const handleClose = () => {
-    setIsModalOpen(false);
-    setEditingUser(null);
-  };
-
-  // Użycie: Usuwanie użytkownika (logika bez zmian)
   const handleDelete = async (id) => {
+    if (!window.confirm("Usunąć użytkownika?")) return;
     const token = getToken();
-
-    if (!window.confirm("Czy na pewno chcesz usunąć tego użytkownika?")) {
-        return;
-    }
-
     try {
         const response = await fetch(`${API_URL}/${id}`, {
             method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
-
         if (response.status === 204) { 
-            toast({
-                title: 'Usunięto pomyślnie.',
-                description: `Użytkownik o ID ${id} został usunięty.`,
-                status: 'success',
-                duration: 3000,
-                isClosable: true,
-            });
+            toast({ title: 'Usunięto', status: 'success' });
             fetchUsers();
-        } else if (response.status === 403) {
-            throw new Error("Brak uprawnień do usunięcia (lub próba usunięcia głównego admina).");
         } else {
-            const errorText = await response.text();
-            throw new Error(`Błąd HTTP: ${response.status}. Odpowiedź: ${errorText}`);
+            throw new Error("Błąd usuwania");
         }
-
     } catch (err) {
-        toast({
-            title: 'Błąd usuwania',
-            description: err.message,
-            status: 'error',
-            duration: 5000,
-            isClosable: true,
-        });
+        toast({ title: 'Błąd', description: err.message, status: 'error' });
     }
   };
   
-  // ⭐️ DODANA FUNKCJA USUWANIA HISTORII (przeniesiona ze StatusIpPage) ⭐️
   const handleDeleteHistory = async () => {
-    if (!window.confirm("Czy na pewno chcesz usunąć CAŁĄ historię czujników z serwera? Tej akcji nie można cofnąć.")) {
-        return;
-    }
-
-    setIsDeleting(true);
-    const token = getToken(); // Używamy funkcji z Twojego AuthContext
-
+    if (!window.confirm("USUNĄĆ CAŁĄ HISTORIĘ CZUJNIKÓW? TEGO NIE DA SIĘ COFNĄĆ!")) return;
+    setIsDeletingHistory(true);
+    const token = getToken();
     try {
         const response = await fetch(DELETE_HISTORY_URL, {
             method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `Błąd serwera: ${response.status}`);
-        }
-
-        toast({
-            title: "Sukces!",
-            description: "Historia czujników została pomyślnie usunięta.",
-            status: "success",
-            duration: 5000,
-            isClosable: true,
-        });
-
+        if (!response.ok) throw new Error("Błąd serwera");
+        toast({ title: "Historia usunięta", status: "success" });
     } catch (error) {
-        toast({
-            title: "Błąd podczas usuwania",
-            description: `Wystąpił błąd: ${error.message}`,
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-        });
+        toast({ title: "Błąd", description: error.message, status: "error" });
     } finally {
-        setIsDeleting(false);
+        setIsDeletingHistory(false);
     }
   };
 
-
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-        fetchUsers()
-    } else if (!authLoading && !isAuthenticated) {
-        setLoading(false);
-    }
+    if (!authLoading && isAuthenticated) fetchUsers();
+    else if (!authLoading && !isAuthenticated) setLoading(false);
   }, [isAuthenticated, authLoading]); 
 
-  if (authLoading) {
-      return <div>Weryfikacja kontekstu...</div>;
-  }
-  
-  if (loading && !users) {
-    return <Spinner size="xl" />
-  }
-
-  if (error) {
-    return (
-      <Alert status="error">
-        <AlertIcon />
-        Błąd: {error}
-      </Alert>
-    )
-  }
-
-  const userList = users || [] 
+  if (authLoading) return <div>Weryfikacja...</div>;
+  if (loading && !users) return <Spinner size="xl" />;
+  if (error) return <Alert status="error"><AlertIcon />{error}</Alert>;
 
   return (
     <Box p={5} shadow="md" borderWidth="1px" borderRadius="md" bg="gray.800">
-      <Heading size="lg" mb={4}>Zarządzanie Użytkownikami (ADMIN CRUD)</Heading>
+      <Heading size="lg" mb={4}>Zarządzanie Użytkownikami</Heading>
       
-      <Button 
-        colorScheme="green" 
-        leftIcon={<FaUserPlus />} 
-        mb={4}
-        onClick={handleOpenCreate}
-      >
-        Dodaj Nowego Użytkownika
+      <Button colorScheme="green" leftIcon={<FaUserPlus />} mb={4} onClick={handleOpenCreate}>
+        Dodaj Użytkownika
       </Button>
 
-      {userList.length > 0 ? (
-        <List spacing={3}>
-          {userList.map(user => (
+      <List spacing={3}>
+        {(users || []).map(user => (
             <ListItem 
               key={user.id} 
               p={3} 
-              bg="gray.700" 
+              // ⭐️ Wizualizacja blokady (Czerwone tło jeśli enabled=false)
+              bg={user.enabled ? "gray.700" : "red.900"} 
               borderRadius="md" 
               display="flex" 
               flexDirection={{ base: 'column', sm: 'row' }}
               justifyContent="space-between" 
-              alignItems={{ base: 'flex-start', sm: 'center' }}
+              alignItems="center"
+              opacity={user.enabled ? 1 : 0.9}
+              borderLeft={user.enabled ? "5px solid #48BB78" : "5px solid #F56565"} // Zielony pasek vs Czerwony pasek
             >
-              <VStack align="flex-start" spacing={1}>
-                <Text fontWeight="bold">{user.email}</Text>
-                <Text fontSize="sm" color="gray.400">{user.name}</Text>
-              </VStack>
+              <HStack spacing={4} flex="1" width="100%">
+                {/* ⭐️ Ikona kłódki */}
+                <Icon 
+                    as={user.enabled ? FaUnlock : FaLock} 
+                    color={user.enabled ? "green.400" : "red.200"} 
+                    boxSize={6} 
+                />
+                
+                <VStack align="flex-start" spacing={0}>
+                    <HStack>
+                        <Text fontWeight="bold" fontSize="lg">{user.email}</Text>
+                        {!user.enabled && <Tag size="sm" colorScheme="red" variant="solid">ZABLOKOWANY</Tag>}
+                    </HStack>
+                    <Text fontSize="sm" color="gray.400">{user.name || "(brak nazwy)"}</Text>
+                </VStack>
+              </HStack>
 
               <HStack spacing={3} mt={{ base: 2, sm: 0 }}>
-                <Tag 
-                    size="sm" 
-                    colorScheme={user.role === 'ADMIN' ? 'red' : 'blue'}
-                >
-                    {user.role}
-                </Tag>
-                {user.twoFactorEnabled ? (
-                    <Tag size="sm" colorScheme="green">2FA Włączone</Tag>
-                ) : (
-                    <Tag size="sm" colorScheme="yellow">Brak 2FA</Tag>
-                )}
+                <Tag size="sm" colorScheme={user.role === 'ADMIN' ? 'purple' : 'blue'}>{user.role}</Tag>
+                
+                {user.twoFactorEnabled && <Tag size="sm" colorScheme="cyan">2FA</Tag>}
+
                 <Button size="sm" leftIcon={<FaEdit />} onClick={() => handleOpenEdit(user)}>
                     Edytuj
                 </Button>
                 <Button 
                     size="sm" 
                     colorScheme="red" 
+                    variant="outline"
                     leftIcon={<FaTrash />} 
                     onClick={() => handleDelete(user.id)} 
                     isDisabled={user.email === 'admin'} 
@@ -446,29 +319,27 @@ function UsersPage() {
                 </Button>
               </HStack>
             </ListItem>
-          ))}
-        </List>
-      ) : (
-        <Text color="gray.400">Brak zarejestrowanych użytkowników do zarządzania.</Text>
-      )}
+        ))}
+      </List>
       
-      {/* ⭐️ DODANA SEKCJA ADMINA (przeniesiona ze StatusIpPage) ⭐️ */}
+      {/* Sekcja Admina - Usuwanie Historii */}
       {isAdmin && (
-        <Box mt={8} p={5} shadow="md" borderWidth="1px" borderRadius="md" bg="gray.900" borderColor="red.500">
-            <Heading size="md" mb={3} color="red.300">Inne Akcje Administracyjne</Heading>
-            <Text mb={4}>Ta akcja jest nieodwracalna i usunie wszystkie dane czujników z bazy danych VPS.</Text>
+        <Box mt={10} p={5} borderWidth="1px" borderRadius="md" borderColor="red.600" bg="rgba(255, 0, 0, 0.05)">
+            <Heading size="md" mb={2} color="red.300">Strefa Niebezpieczna</Heading>
+            <Text fontSize="sm" mb={4} color="gray.400">
+                Poniższa akcja trwale usunie wszystkie odczyty z czujników zebrane w bazie danych. Użytkownicy i konfiguracja zostaną zachowane.
+            </Text>
             <Button
                 colorScheme="red"
-                isLoading={isDeleting}
+                isLoading={isDeletingHistory}
                 onClick={handleDeleteHistory}
                 leftIcon={<WarningIcon />}
             >
-                Usuń całą historię czujników z VPS
+                Wyczyść całą historię pomiarów
             </Button>
         </Box>
       )}
 
-      {/* Komponent Modala (poza głównym Boxem) */}
       <UserForm 
           initialData={editingUser} 
           isOpen={isModalOpen} 

@@ -1,4 +1,3 @@
-
 import { Box, Flex, Heading, Link, Spacer, Button, Text } from '@chakra-ui/react'
 import { Link as RouterLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext' 
@@ -6,13 +5,6 @@ import { useAuth } from '../context/AuthContext'
 function Navbar() {
   // ⭐️ POBIERAMY userEmail, isAdmin I logout ⭐️
   const { userEmail, logout, isAdmin } = useAuth();
-
-  // Opcjonalne: Możemy ukryć linki dla ADMINA, jeśli nie ma roli ADMIN
-  const userLink = (
-    <Link as={RouterLink} to="/users" color="blue.300" fontWeight="medium">
-      Użytkownicy
-    </Link>
-  );
 
   return (
     <Box
@@ -31,7 +23,6 @@ function Navbar() {
         
         {/* LEWA STRONA (Status Zalogowania) */}
         <Flex align="center" gap={3}>
-          {/* ⭐️ UŻYCIE POBRANEGO EMAILA ⭐️ */}
           <Text color="white" fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>
             Witaj, {userEmail || 'Użytkowniku'}
           </Text>
@@ -43,23 +34,34 @@ function Navbar() {
         <Spacer />
 
         {/* PRAWA STRONA (Linki Nawigacyjne) */}
-        <Flex gap={4}>
+        <Flex gap={4} alignItems="center">
           <Link as={RouterLink} to="/" color="blue.300" fontWeight="medium">
             Strona Główna
           </Link>
           <Link as={RouterLink} to="/status-ip" color="blue.300" fontWeight="medium">
             Status IP
           </Link>
-		  {/* ⭐️ DODANY LINK DO KONTA ⭐️ */}
           <Link as={RouterLink} to="/konto" color="blue.300" fontWeight="medium">
             Moje Konto
           </Link>
-          {/* ⭐️ Wyświetlamy link /users tylko dla ADMINA ⭐️ */}
-          {isAdmin && userLink} 
+
+          {/* ⭐️ SEKCJA ADMINA (Widoczna tylko dla roli ADMIN) ⭐️ */}
+          {isAdmin && (
+            <>
+              <Link as={RouterLink} to="/users" color="orange.300" fontWeight="bold">
+                Użytkownicy
+              </Link>
+              <Link as={RouterLink} to="/logs" color="orange.300" fontWeight="bold">
+                Logi Serwera
+              </Link>
+            </>
+          )}
+
+          {/* Reszta linków */}
           <Link as={RouterLink} to="/api-test" color="blue.300" fontWeight="medium">
             Test API
           </Link>
-	      <Link as={RouterLink} to="/upload" color="blue.300" fontWeight="medium">
+          <Link as={RouterLink} to="/upload" color="blue.300" fontWeight="medium">
             Wyślij Plik
           </Link>
           <Link as={RouterLink} to="/files" color="blue.300" fontWeight="medium">
