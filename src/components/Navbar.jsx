@@ -38,9 +38,6 @@ function Navbar() {
           <Link as={RouterLink} to="/" color="blue.300" fontWeight="medium">
             Strona Główna
           </Link>
-          <Link as={RouterLink} to="/status-ip" color="blue.300" fontWeight="medium">
-            Status IP
-          </Link>
           <Link as={RouterLink} to="/konto" color="blue.300" fontWeight="medium">
             Moje Konto
           </Link>
@@ -48,19 +45,25 @@ function Navbar() {
           {/* ⭐️ SEKCJA ADMINA (Widoczna tylko dla roli ADMIN) ⭐️ */}
           {isAdmin && (
             <>
+			  <Link as={RouterLink} to="/status-ip" color="orange.300" fontWeight="medium">
+				Status IP
+			  </Link>
               <Link as={RouterLink} to="/users" color="orange.300" fontWeight="bold">
                 Użytkownicy
               </Link>
-              <Link as={RouterLink} to="/logs" color="orange.300" fontWeight="bold">
-                Logi Serwera
+			  <Link as={RouterLink} to="/admin/gateways" color="orange.300" fontWeight="bold">
+                Status Bramek
               </Link>
 			  <Link as={RouterLink} to="/updates" color="orange.300" fontWeight="bold">
                 Aktualizacje
               </Link>
+              <Link as={RouterLink} to="/logs" color="orange.300" fontWeight="bold">
+                Logi Serwera
+              </Link>
             </>
           )}
 
-          {/* Reszta linków */}
+          {/* LEWA STRONA (Linki Nawigacyjne) */}
           <Link as={RouterLink} to="/api-test" color="blue.300" fontWeight="medium">
             Test API
           </Link>
@@ -70,6 +73,9 @@ function Navbar() {
           <Link as={RouterLink} to="/files" color="blue.300" fontWeight="medium">
             Pobrane Pliki
           </Link>
+		  <Link as={RouterLink} to="/privacy" color="blue.300" fontWeight="medium">
+		    Polityka Prywatności
+		  </Link>
         </Flex>
       </Flex>
     </Box>

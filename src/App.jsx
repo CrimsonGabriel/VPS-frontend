@@ -19,6 +19,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import LogsPage from './pages/LogsPage';
 import UpdatesPage from './pages/UpdatesPage';
+import GatewayStatusPage from './pages/GatewayStatusPage';
 
 function App() {
   return (
@@ -30,12 +31,11 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
 		<Route path="/reset-password" element={<ResetPasswordPage />} />
 		<Route path="/forbidden" element={<ForbiddenPage />} />
-        {/* 👇 2. NOWA LINIA (TRASA) */}
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
 
         {/* 1. TRASY CHRONIONE (Wymagany Token - Rola USER lub ADMIN) */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/status-ip" element={<StatusIpPage />} />
+          
           <Route path="/api-test" element={<ApiTestPage />} />
 	  <Route path="/upload" element={<FileUploadPage />} />
     	  <Route path="/files" element={<FileListPage />} />
@@ -46,9 +46,11 @@ function App() {
         {/* ⭐️ Dodajemy requiredRole="ROLE_ADMIN" ⭐️ */}
         <Route element={<ProtectedRoute requiredRole="ROLE_ADMIN" />}>
           {/* Użytkownicy - panel CRUD */}
+		  <Route path="/status-ip" element={<StatusIpPage />} />
           <Route path="/users" element={<UsersPage />} /> 
-		  <Route path="/logs" element={<LogsPage />} /> {/* <--- Nowa trasa */}
+		  <Route path="/logs" element={<LogsPage />} />
 		  <Route path="/updates" element={<UpdatesPage />} />
+		  <Route path="/admin/gateways" element={<GatewayStatusPage />} />
 		</Route>
 
         {/* Catch-all route */}
