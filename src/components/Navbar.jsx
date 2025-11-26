@@ -1,10 +1,10 @@
-import { Box, Flex, Heading, Link, Spacer, Button, Text } from '@chakra-ui/react'
+// 💾 src/components/Navbar.jsx
+import { Box, Flex, Link, Spacer, Button, Text, Avatar } from '@chakra-ui/react'
 import { Link as RouterLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext' 
 
 function Navbar() {
-  // ⭐️ POBIERAMY userEmail, isAdmin I logout ⭐️
-  const { userEmail, logout, isAdmin } = useAuth();
+  const { userEmail, logout, isAdmin, userAvatar } = useAuth();
 
   return (
     <Box
@@ -21,8 +21,26 @@ function Navbar() {
     >
       <Flex align="center">
         
-        {/* LEWA STRONA (Status Zalogowania) */}
+        {/* LEWA STRONA */}
         <Flex align="center" gap={3}>
+          {/* ⭐️ FIX:
+            1. name={userAvatar ? "" : userEmail} -> Jeśli mamy URL, czyścimy name.
+               Dzięki temu nie ma skoku "Litera -> Obrazek". Jest "Szare tło -> Obrazek".
+            2. loading="eager" -> Wymuszamy na przeglądarce priorytetowe ładowanie.
+          */}
+          <Avatar 
+            size="sm" 
+            src={userAvatar} 
+            name={userAvatar ? "" : userEmail}
+            key={userAvatar} 
+            bg="gray.700"
+            color="white"
+            imgProps={{ 
+                loading: "eager",
+                decoding: "async" 
+            }}
+          />
+          
           <Text color="white" fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>
             Witaj, {userEmail || 'Użytkowniku'}
           </Text>
@@ -33,7 +51,7 @@ function Navbar() {
 
         <Spacer />
 
-        {/* PRAWA STRONA (Linki Nawigacyjne) */}
+        {/* PRAWA STRONA - BEZ ZMIAN */}
         <Flex gap={4} alignItems="center">
           <Link as={RouterLink} to="/" color="blue.300" fontWeight="medium">
             Strona Główna
@@ -42,19 +60,18 @@ function Navbar() {
             Moje Konto
           </Link>
 
-          {/* ⭐️ SEKCJA ADMINA (Widoczna tylko dla roli ADMIN) ⭐️ */}
           {isAdmin && (
             <>
-			  <Link as={RouterLink} to="/status-ip" color="orange.300" fontWeight="medium">
-				Status IP
-			  </Link>
+              <Link as={RouterLink} to="/status-ip" color="orange.300" fontWeight="medium">
+                Status IP
+              </Link>
               <Link as={RouterLink} to="/users" color="orange.300" fontWeight="bold">
                 Użytkownicy
               </Link>
-			  <Link as={RouterLink} to="/admin/gateways" color="orange.300" fontWeight="bold">
+              <Link as={RouterLink} to="/admin/gateways" color="orange.300" fontWeight="bold">
                 Status Bramek
               </Link>
-			  <Link as={RouterLink} to="/updates" color="orange.300" fontWeight="bold">
+              <Link as={RouterLink} to="/updates" color="orange.300" fontWeight="bold">
                 Aktualizacje
               </Link>
               <Link as={RouterLink} to="/logs" color="orange.300" fontWeight="bold">
@@ -63,7 +80,6 @@ function Navbar() {
             </>
           )}
 
-          {/* LEWA STRONA (Linki Nawigacyjne) */}
           <Link as={RouterLink} to="/api-test" color="blue.300" fontWeight="medium">
             Test API
           </Link>
@@ -73,9 +89,9 @@ function Navbar() {
           <Link as={RouterLink} to="/files" color="blue.300" fontWeight="medium">
             Pobrane Pliki
           </Link>
-		  <Link as={RouterLink} to="/privacy" color="blue.300" fontWeight="medium">
-		    Polityka Prywatności
-		  </Link>
+          <Link as={RouterLink} to="/privacy" color="blue.300" fontWeight="medium">
+            Polityka Prywatności
+          </Link>
         </Flex>
       </Flex>
     </Box>

@@ -1,513 +1,553 @@
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Box, Heading, Text, Spinner, Alert, AlertIcon,
-  VStack, Button, useToast, FormControl, FormLabel, Input,
-  Divider, SimpleGrid,
-  // ⭐️ DODANE IMPORTY DLA 2FA ⭐️
-  Tag, 
-  Image, 
-  HStack, 
-  useClipboard 
+  Box, Container, VStack, HStack, Text, Heading, 
+  Button, Input, FormControl, FormLabel, Avatar, 
+  Divider, useToast, Spinner, Tabs, TabList, TabPanels, 
+  Tab, TabPanel, Card, Badge, SimpleGrid, IconButton, 
+  useColorModeValue, InputGroup, InputRightElement, 
+  Image, useClipboard, Fade, Tooltip
 } from '@chakra-ui/react';
-import { useState, useEffect } from 'react';
+// ⭐️ POPRAWKA: Usunięto ShieldIcon, używamy LockIcon do sekcji bezpieczeństwa
+import { ViewIcon, ViewOffIcon, EditIcon, CheckIcon, CloseIcon, LockIcon } from '@chakra-ui/icons';
 import { useAuth } from '../context/AuthContext';
 
-// Endpointy, których będziemy używać
-const API_GET_USER_DETAILS = '/api/user/me';
+// --- KONFIGURACJA ENDPOINTÓW ---
+const API_USER_ME = '/api/user/me';
+const API_USER_AVATAR = '/api/user/avatar';
 const API_CHANGE_PASSWORD = '/api/user/change-password';
-
-// ⭐️ ENDPOINTY DLA 2FA (z AuthController.java) ⭐️
 const API_2FA_STATUS = '/api/auth/2fa/status';
 const API_2FA_SETUP = '/api/auth/2fa/setup';
 const API_2FA_VERIFY = '/api/auth/2fa/verify';
 const API_2FA_DISABLE = '/api/auth/2fa/disable';
 
-
-function AccountPage() {
-  const { getToken, logout, userEmail: emailFromContext } = useAuth();
+export default function AccountPage() {
+  const { getToken, refreshUserData, userAvatar, userRole, userEmail, logout } = useAuth();
   const toast = useToast();
-
-  // --- Stany dla Danych Użytkownika i Hasła (bez zmian) ---
-  const [userData, setUserData] = useState({ email: emailFromContext, name: '' });
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
-  const [errorUser, setErrorUser] = useState(null);
-  const [passwords, setPasswords] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [isLoadingPassword, setIsLoadingPassword] = useState(false);
-
-  // ------------------------------------
-  // ⭐️⭐️ POCZĄTEK: NOWE STANY DLA 2FA ⭐️⭐️
-  // ------------------------------------
+  const fileInputRef = useRef(null);
   
-  // Przechowuje aktualny status 2FA (true/false)
+  // --- STYLE (Chakra UI Theme) ---
+  const cardBg = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const mutedColor = useColorModeValue('gray.500', 'gray.400');
+
+  // --- STANY: DANE PROFILOWE ---
+  const [profileData, setProfileData] = useState({ name: '', email: '' });
+  const [tempName, setTempName] = useState('');
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // --- STANY: HASŁO ---
+  const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
+  const [showPass, setShowPass] = useState(false);
+  const [isChangingPass, setIsChangingPass] = useState(false);
+
+  // --- STANY: 2FA ---
   const [twoFaStatus, setTwoFaStatus] = useState(false);
-  // Pokazuje spinner obok statusu
-  const [isLoadingTwoFaStatus, setIsLoadingTwoFaStatus] = useState(true);
-  // Przechowuje dane z /setup (secret i otpauth_url)
-  const [twoFaSetupData, setTwoFaSetupData] = useState(null);
-  // Kod weryfikacyjny wpisywany przez użytkownika
-  const [twoFaVerifyCode, setTwoFaVerifyCode] = useState('');
-  // Loading dla przycisków (Włącz/Weryfikuj/Wyłącz)
+  const [twoFaSetupData, setTwoFaSetupData] = useState(null); // { secret, otpauth_url }
+  const [twoFaCode, setTwoFaCode] = useState('');
   const [isProcessingTwoFa, setIsProcessingTwoFa] = useState(false);
-  // Hook do kopiowania sekretu
-  const { onCopy: onCopySecret, hasCopied: hasCopiedSecret } = useClipboard(twoFaSetupData?.secret || '');
-
-  // ------------------------------------
-  // ⭐️⭐️ KONIEC: NOWE STANY DLA 2FA ⭐️⭐️
-  // ------------------------------------
-
-
-  // --- 1. POBIERANIE DANYCH (UŻYTKOWNIKA ORAZ STATUSU 2FA) ---
-  useEffect(() => {
-    const token = getToken();
-    
-    // --- Pobieranie danych użytkownika (bez zmian) ---
-    const fetchUserDetails = async () => {
-      setIsLoadingUser(true);
-      setErrorUser(null);
-      try {
-        const response = await fetch(API_GET_USER_DETAILS, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.status === 401) {
-          toast({ title: 'Sesja wygasła', status: 'error', isClosable: true });
-          logout();
-          return;
-        }
-        if (!response.ok) throw new Error('Nie udało się pobrać danych użytkownika.');
-        const data = await response.json();
-        setUserData({ email: data.email, name: data.name || 'Brak' });
-      } catch (err) {
-        setErrorUser(err.message);
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-
-    // ⭐️ NOWA FUNKCJA: Pobieranie statusu 2FA ⭐️
-    const fetchTwoFaStatus = async () => {
-      setIsLoadingTwoFaStatus(true);
-      try {
-        const response = await fetch(API_2FA_STATUS, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error('Nie udało się pobrać statusu 2FA.');
-        const data = await response.json();
-        setTwoFaStatus(data.is2FAEnabled || false);
-      } catch (err) {
-        console.error(err.message);
-        // Nie pokazuj błędu, po prostu zostaw jako wyłączone
-      } finally {
-        setIsLoadingTwoFaStatus(false);
-      }
-    };
-
-    // Wywołaj obie funkcje
-    fetchUserDetails();
-    fetchTwoFaStatus();
-    
-  }, [getToken, logout, toast]);
-
-  // --- 2. LOGIKA ZMIANY HASŁA (bez zmian) ---
-  const handlePasswordChange = (e) => {
-    // ... (bez zmian) ...
-    const { name, value } = e.target;
-    setPasswords(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handlePasswordSubmit = async (e) => {
-    // ... (bez zmian) ...
-    e.preventDefault();
-    setIsLoadingPassword(true);
-
-    if (passwords.newPassword.length < 8) {
-      toast({ title: 'Hasło musi mieć co najmniej 8 znaków', status: 'warning', isClosable: true });
-      setIsLoadingPassword(false);
-      return;
-    }
-    if (passwords.newPassword !== passwords.confirmPassword) {
-      toast({ title: 'Nowe hasła nie są zgodne', status: 'warning', isClosable: true });
-      setIsLoadingPassword(false);
-      return;
-    }
-
-    const token = getToken();
-    try {
-      const response = await fetch(API_CHANGE_PASSWORD, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          currentPassword: passwords.currentPassword,
-          newPassword: passwords.newPassword
-        })
-      });
-      if (response.status === 403) throw new Error('Obecne hasło jest nieprawidłowe.');
-      if (!response.ok) throw new Error('Wystąpił błąd serwera.');
-
-      toast({ title: 'Hasło zmienione pomyślnie!', status: 'success', isClosable: true });
-      setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    } catch (err) {
-      toast({ title: 'Błąd zmiany hasła', description: err.message, status: 'error', isClosable: true });
-    } finally {
-      setIsLoadingPassword(false);
-    }
-  };
-
-
-  // ------------------------------------
-  // ⭐️⭐️ POCZĄTEK: NOWE FUNKCJE 2FA ⭐️⭐️
-  // ------------------------------------
-
-  // Krok 1: Kliknięcie "Włącz 2FA" -> pobiera QR kod i sekret
-  const handleSetup2FA = async () => {
-    setIsProcessingTwoFa(true);
-    setTwoFaSetupData(null); // Zresetuj stare dane
-    try {
-      const response = await fetch(API_2FA_SETUP, {
-        method: 'POST', // Używamy POST, jak w Androidzie
-        headers: { 'Authorization': `Bearer ${getToken()}` }
-      });
-      if (!response.ok) throw new Error('Nie udało się rozpocząć konfiguracji 2FA.');
-      
-      const data = await response.json();
-      if (!data.success) throw new Error(data.message || 'Serwer odrzucił konfigurację.');
-
-      setTwoFaSetupData({
-        secret: data.secret,
-        otpauth_url: data.otpauth_url
-      });
-
-    } catch (err) {
-      toast({ title: 'Błąd konfiguracji 2FA', description: err.message, status: 'error', isClosable: true });
-    } finally {
-      setIsProcessingTwoFa(false);
-    }
-  };
-
-  // Krok 2: Wpisanie kodu z aplikacji i kliknięcie "Weryfikuj"
-  const handleVerify2FA = async (e) => {
-    e.preventDefault();
-    if (!twoFaVerifyCode || twoFaVerifyCode.length !== 6) {
-      toast({ title: 'Kod 2FA musi mieć 6 cyfr', status: 'warning', isClosable: true });
-      return;
-    }
-    setIsProcessingTwoFa(true);
-    try {
-      const response = await fetch(API_2FA_VERIFY, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getToken()}`
-        },
-        body: JSON.stringify({ totpCode: twoFaVerifyCode })
-      });
-
-      if (!response.ok) {
-         // Serwer zwraca 400 dla złego kodu
-         throw new Error('Nieprawidłowy kod 2FA. Spróbuj ponownie.');
-      }
-
-      toast({ title: '2FA Włączone Pomyślnie!', status: 'success', isClosable: true });
-      setTwoFaStatus(true); // Aktualizuj status
-      setTwoFaSetupData(null); // Zamknij sekcję konfiguracji
-      setTwoFaVerifyCode(''); // Wyczyść pole
-
-    } catch (err) {
-      toast({ title: 'Błąd weryfikacji 2FA', description: err.message, status: 'error', isClosable: true });
-    } finally {
-      setIsProcessingTwoFa(false);
-    }
-  };
-
-  // Krok 3: Wyłączenie 2FA (wymaga kodu)
-  const handleDisable2FA = async (e) => {
-    e.preventDefault();
-    if (!twoFaVerifyCode || twoFaVerifyCode.length !== 6) {
-      toast({ title: 'Kod 2FA musi mieć 6 cyfr', status: 'warning', isClosable: true });
-      return;
-    }
-    setIsProcessingTwoFa(true);
-    try {
-      const response = await fetch(API_2FA_DISABLE, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getToken()}`
-        },
-        body: JSON.stringify({ totpCode: twoFaVerifyCode })
-      });
-      
-      if (!response.ok) {
-         throw new Error('Nieprawidłowy kod 2FA. Spróbuj ponownie.');
-      }
-
-      toast({ title: '2FA Wyłączone Pomyślnie!', status: 'info', isClosable: true });
-      setTwoFaStatus(false); // Aktualizuj status
-      setTwoFaSetupData(null); // Zamknij sekcję
-      setTwoFaVerifyCode(''); // Wyczyść pole
-
-    } catch (err) {
-      toast({ title: 'Błąd wyłączania 2FA', description: err.message, status: 'error', isClosable: true });
-    } finally {
-      setIsProcessingTwoFa(false);
-    }
-  };
-
-  // Anulowanie konfiguracji (zamyka QR kod)
-  const cancelSetup = () => {
-    setTwoFaSetupData(null);
-    setTwoFaVerifyCode('');
-  };
-
-  // ------------------------------------
-  // ⭐️⭐️ KONIEC: NOWE FUNKCJE 2FA ⭐️⭐️
-  // ------------------------------------
-
-
-  // --- 3. RENDEROWANIE WIDOKU ---
   
-  const renderUserDetails = () => {
-    // ... (bez zmian) ...
-    if (isLoadingUser) return <Spinner />;
-    if (errorUser) {
+  // Hook do kopiowania sekretu 2FA
+  const { onCopy, hasCopied } = useClipboard(twoFaSetupData?.secret || '');
+
+
+  // =========================================================================
+  // 1. INICJALIZACJA DANYCH
+  // =========================================================================
+  useEffect(() => {
+    const fetchAllData = async () => {
+      setIsLoadingData(true);
+      const token = getToken();
+      if(!token) { logout(); return; }
+
+      try {
+        // A. Pobierz dane użytkownika
+        const userRes = await fetch(API_USER_ME, { headers: { 'Authorization': `Bearer ${token}` }});
+        if (userRes.status === 401) { logout(); return; }
+        
+        if (userRes.ok) {
+            const userData = await userRes.json();
+            setProfileData({ 
+                name: userData.name || '', 
+                email: userData.email || userEmail 
+            });
+            setTempName(userData.name || '');
+        }
+
+        // B. Pobierz status 2FA
+        const twoFaRes = await fetch(API_2FA_STATUS, { headers: { 'Authorization': `Bearer ${token}` }});
+        if (twoFaRes.ok) {
+            const twoFaData = await twoFaRes.json();
+            setTwoFaStatus(twoFaData.is2FAEnabled);
+        }
+
+      } catch (e) {
+        console.error("Błąd init:", e);
+        toast({ title: "Błąd pobierania danych konta", status: "error", isClosable: true });
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchAllData();
+  }, [getToken, userEmail, logout, toast]);
+
+
+  // =========================================================================
+  // 2. OBSŁUGA AVATARA (UPLOAD)
+  // =========================================================================
+  const handleAvatarClick = () => {
+    fileInputRef.current.click(); 
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Walidacja rozmiaru (np. max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        return toast({ title: "Plik jest za duży (max 5MB)", status: "warning" });
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setIsUploadingAvatar(true);
+    try {
+        const res = await fetch(API_USER_AVATAR, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${getToken()}` },
+            body: formData
+        });
+
+        if (!res.ok) throw new Error("Upload failed");
+        
+        await refreshUserData(); 
+        
+        toast({ title: "Avatar zaktualizowany!", status: "success" });
+    } catch (err) {
+        console.error(err);
+        toast({ title: "Błąd aktualizacji avatara", description: "Sprawdź logi serwera.", status: "error" });
+    } finally {
+        setIsUploadingAvatar(false);
+    }
+  };
+
+
+  // =========================================================================
+  // 3. OBSŁUGA EDYCJI PROFILU (IMIĘ)
+  // =========================================================================
+  const handleSaveProfile = async () => {
+    try {
+        const res = await fetch(API_USER_ME, {
+            method: 'PUT',
+            headers: { 
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name: tempName })
+        });
+        
+        if(!res.ok) throw new Error("Update failed");
+
+        setProfileData(prev => ({ ...prev, name: tempName }));
+        setIsEditingProfile(false);
+        await refreshUserData();
+        toast({ title: "Profil zaktualizowany", status: "success" });
+
+    } catch (e) {
+        toast({ title: "Nie udało się zapisać zmian", status: "error" });
+    }
+  };
+
+
+  // =========================================================================
+  // 4. OBSŁUGA ZMIANY HASŁA
+  // =========================================================================
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if(passwords.new !== passwords.confirm) {
+        return toast({ title: "Nowe hasła muszą być identyczne", status: "warning" });
+    }
+    if(passwords.new.length < 8) {
+        return toast({ title: "Hasło musi mieć min. 8 znaków", status: "warning" });
+    }
+
+    setIsChangingPass(true);
+    try {
+        const res = await fetch(API_CHANGE_PASSWORD, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json', 
+                'Authorization': `Bearer ${getToken()}` 
+            },
+            body: JSON.stringify({ 
+                currentPassword: passwords.current, 
+                newPassword: passwords.new 
+            })
+        });
+
+        if(!res.ok) {
+             const errData = await res.json().catch(() => ({}));
+             throw new Error(errData.error || "Wystąpił błąd");
+        }
+
+        toast({ title: "Hasło zostało zmienione", status: "success" });
+        setPasswords({ current: '', new: '', confirm: '' });
+    } catch(e) {
+        toast({ title: "Błąd zmiany hasła", description: e.message, status: "error" });
+    } finally {
+        setIsChangingPass(false);
+    }
+  };
+
+
+  // =========================================================================
+  // 5. OBSŁUGA 2FA (SETUP, VERIFY, DISABLE)
+  // =========================================================================
+  const setup2FA = async () => {
+    setIsProcessingTwoFa(true);
+    try {
+        const res = await fetch(API_2FA_SETUP, { method: 'POST', headers: { 'Authorization': `Bearer ${getToken()}` }});
+        const data = await res.json();
+        if(data.success) {
+            setTwoFaSetupData(data);
+        } else {
+            throw new Error(data.message);
+        }
+    } catch(e) { 
+        toast({ title: "Błąd inicjalizacji 2FA", status: "error" }); 
+    } finally { 
+        setIsProcessingTwoFa(false); 
+    }
+  };
+
+  const finalize2FA = async (isDisableMode = false) => {
+    if(!twoFaCode || twoFaCode.length !== 6) {
+        return toast({ title: "Kod musi mieć 6 cyfr", status: "warning" });
+    }
+
+    setIsProcessingTwoFa(true);
+    const endpoint = isDisableMode ? API_2FA_DISABLE : API_2FA_VERIFY;
+
+    try {
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+            body: JSON.stringify({ totpCode: twoFaCode })
+        });
+        
+        if(!res.ok) throw new Error("Nieprawidłowy kod");
+        
+        setTwoFaStatus(!isDisableMode);
+        setTwoFaSetupData(null);
+        setTwoFaCode('');
+        
+        toast({ 
+            title: isDisableMode ? "2FA Wyłączone" : "2FA Włączone Pomyślnie", 
+            status: isDisableMode ? "info" : "success" 
+        });
+
+    } catch(e) {
+        toast({ title: "Weryfikacja nieudana", description: "Sprawdź kod i spróbuj ponownie.", status: "error" });
+    } finally {
+        setIsProcessingTwoFa(false);
+    }
+  };
+
+
+  // =========================================================================
+  // WIDOK (RENDER)
+  // =========================================================================
+  if (isLoadingData) {
       return (
-        <Alert status="error">
-          <AlertIcon />
-          {errorUser}
-        </Alert>
+          <Box h="80vh" display="flex" alignItems="center" justifyContent="center">
+              <Spinner size="xl" color="blue.500" thickness="4px" />
+          </Box>
       );
-    }
-    return (
-      <VStack spacing={3} align="flex-start">
-        <Box>
-          <Text fontSize="sm" color="gray.400">Adres e-mail</Text>
-          <Text fontSize="lg" fontWeight="bold">{userData.email}</Text>
-        </Box>
-        <Box>
-          <Text fontSize="sm" color="gray.400">Imię / Nazwa</Text>
-          <Text fontSize="lg" fontWeight="bold">{userData.name}</Text>
-        </Box>
-      </VStack>
-    );
-  };
-
-  // ⭐️ NOWA FUNKCJA: Renderowanie statusu 2FA (jak w UsersPage) ⭐️
-  const renderTwoFaStatus = () => {
-    if (isLoadingTwoFaStatus) return <Spinner size="sm" />;
-    
-    return twoFaStatus ? (
-      <Tag size="md" colorScheme="green">2FA Włączone</Tag>
-    ) : (
-      <Tag size="md" colorScheme="yellow">Brak 2FA</Tag>
-    );
-  };
-
-  // ⭐️ NOWA FUNKCJA: Renderowanie sekcji konfiguracji lub wyłączania 2FA ⭐️
-  const renderTwoFaSection = () => {
-    // 1. Widok WŁĄCZANIA (po kliknięciu "Włącz 2FA")
-    if (twoFaSetupData && !twoFaStatus) {
-      return (
-        <VStack as="form" spacing={4} align="stretch" p={4} borderWidth="1px" borderRadius="md" bg="gray.700" mt={4} onSubmit={handleVerify2FA}>
-          <Text fontWeight="bold">Krok 1: Zeskanuj kod QR</Text>
-          <Text fontSize="sm">Użyj aplikacji Google Authenticator (lub podobnej), aby zeskanować poniższy kod.</Text>
-          <Image
-            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(twoFaSetupData.otpauth_url)}`}
-            alt="QR Code"
-            boxSize="200px"
-            mx="auto"
-            bg="white"
-            p={2}
-            borderRadius="md"
-          />
-          <Text fontSize="sm" textAlign="center">Lub wprowadź klucz ręcznie:</Text>
-          <HStack>
-            <Input
-              value={twoFaSetupData.secret}
-              isReadOnly
-              fontFamily="monospace"
-              size="sm"
-            />
-            <Button size="sm" onClick={onCopySecret}>
-              {hasCopiedSecret ? 'Skopiowano!' : 'Kopiuj'}
-            </Button>
-          </HStack>
-          
-          <Divider my={2} />
-          
-          <Text fontWeight="bold">Krok 2: Wprowadź kod weryfikacyjny</Text>
-          <FormControl isRequired>
-            <FormLabel>Kod 2FA</FormLabel>
-            <Input
-              type="text"
-              name="twoFaVerifyCode"
-              value={twoFaVerifyCode}
-              onChange={(e) => setTwoFaVerifyCode(e.target.value.replace(/\D/g, ''))} // Tylko cyfry
-              placeholder="123456"
-              maxLength={6}
-            />
-          </FormControl>
-          <HStack>
-            <Button
-              type="submit"
-              colorScheme="green"
-              isLoading={isProcessingTwoFa}
-            >
-              Weryfikuj i Włącz
-            </Button>
-            <Button variant="ghost" onClick={cancelSetup} isDisabled={isProcessingTwoFa}>
-              Anuluj
-            </Button>
-          </HStack>
-        </VStack>
-      );
-    }
-
-    // 2. Widok WYŁĄCZANIA (po kliknięciu "Wyłącz 2FA")
-    if (twoFaSetupData && twoFaStatus) {
-       return (
-        <VStack as="form" spacing={4} align="stretch" p={4} borderWidth="1px" borderRadius="md" bg="gray.700" mt={4} onSubmit={handleDisable2FA}>
-          <Text fontWeight="bold">Potwierdź wyłączenie 2FA</Text>
-          <Text fontSize="sm">Aby potwierdzić, wprowadź kod 2FA ze swojej aplikacji.</Text>
-          <FormControl isRequired>
-            <FormLabel>Obecny kod 2FA</FormLabel>
-            <Input
-              type="text"
-              name="twoFaVerifyCode"
-              value={twoFaVerifyCode}
-              onChange={(e) => setTwoFaVerifyCode(e.target.value.replace(/\D/g, ''))}
-              placeholder="123456"
-              maxLength={6}
-            />
-          </FormControl>
-          <HStack>
-            <Button
-              type="submit"
-              colorScheme="red"
-              isLoading={isProcessingTwoFa}
-            >
-              Potwierdź i Wyłącz
-            </Button>
-            <Button variant="ghost" onClick={cancelSetup} isDisabled={isProcessingTwoFa}>
-              Anuluj
-            </Button>
-          </HStack>
-        </VStack>
-      );
-    }
-    
-    // 3. Widok domyślny (żaden)
-    return null;
-  };
-
+  }
 
   return (
-    <Box p={5} shadow="md" borderWidth="1px" borderRadius="md" bg="gray.800" maxW="4xl" mx="auto">
-      <Heading size="lg" mb={6}>Moje Konto</Heading>
-
-      {/* --- Sekcja Dane i Hasło (bez zmian) --- */}
-      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={10}>
+    <Container maxW="container.xl" py={10}>
+      <SimpleGrid columns={{ base: 1, lg: 12 }} spacing={8}>
         
-        {/* Kolumna 1: Dane Użytkownika */}
-        <VStack spacing={4} align="flex-start">
-          <Heading size="md" mb={2}>Twoje Dane</Heading>
-          {renderUserDetails()}
-        </VStack>
+        {/* --- LEWA KOLUMNA: WIZYTÓWKA UŻYTKOWNIKA --- */}
+        <Box gridColumn={{ base: "span 1", lg: "span 4" }}>
+            <Card bg={cardBg} boxShadow="xl" borderRadius="2xl" border="1px" borderColor={borderColor} textAlign="center" py={10} px={6} position="relative" overflow="hidden">
+                <Box position="absolute" top={0} left={0} right={0} h="120px" bgGradient="linear(to-br, blue.600, purple.600)" zIndex={0} />
+                
+                <Box position="relative" zIndex={1} mt={8}>
+                    {/* AVATAR WRAPPER */}
+                    <Box display="inline-block" position="relative">
+                        <Avatar 
+                            size="2xl" 
+                            src={userAvatar}
+                            name={profileData.name} 
+                            border="4px solid white" 
+                            boxShadow="lg"
+                            bg="gray.300"
+                            opacity={isUploadingAvatar ? 0.6 : 1}
+                        />
+                        <Tooltip label="Zmień zdjęcie profilowe" hasArrow>
+                            <IconButton
+                                aria-label="Upload Avatar"
+                                icon={isUploadingAvatar ? <Spinner size="xs"/> : <EditIcon />}
+                                size="sm"
+                                colorScheme="blue"
+                                rounded="full"
+                                position="absolute"
+                                bottom="5px"
+                                right="5px"
+                                shadow="md"
+                                onClick={handleAvatarClick}
+                                isDisabled={isUploadingAvatar}
+                            />
+                        </Tooltip>
+                        <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileChange} />
+                    </Box>
 
-        {/* Kolumna 2: Zmiana Hasła */}
-        <VStack as="form" spacing={4} align="flex-start" onSubmit={handlePasswordSubmit}>
-          <Heading size="md" mb={2}>Zmień Hasło</Heading>
-          {/* ... (reszta formularza zmiany hasła bez zmian) ... */}
-          <FormControl isRequired>
-            <FormLabel>Obecne hasło</FormLabel>
-            <Input
-              type="password"
-              name="currentPassword"
-              value={passwords.currentPassword}
-              onChange={handlePasswordChange}
-              placeholder="••••••••"
-            />
-          </FormControl>
-          <FormControl isRequired>
-            <FormLabel>Nowe hasło (min. 8 znaków)</FormLabel>
-            <Input
-              type="password"
-              name="newPassword"
-              value={passwords.newPassword}
-              onChange={handlePasswordChange}
-              placeholder="••••••••"
-            />
-          </FormControl>
-          <FormControl isRequired>
-            <FormLabel>Potwierdź nowe hasło</FormLabel>
-            <Input
-              type="password"
-              name="confirmPassword"
-              value={passwords.confirmPassword}
-              onChange={handlePasswordChange}
-              placeholder="••••••••"
-            />
-          </FormControl>
-          <Button
-            type="submit"
-            colorScheme="blue"
-            isLoading={isLoadingPassword}
-          >
-            Zaktualizuj hasło
-          </Button>
-        </VStack>
+                    <Heading size="lg" mt={4} mb={1}>{profileData.name || 'Użytkownik'}</Heading>
+                    <Text color={mutedColor} fontSize="sm">{profileData.email}</Text>
+
+                    <HStack justify="center" mt={4} spacing={2}>
+                        <Badge colorScheme={userRole === 'ROLE_ADMIN' ? 'red' : 'blue'} px={3} py={1} borderRadius="full" variant="subtle">
+                            {userRole === 'ROLE_ADMIN' ? 'ADMINISTRATOR' : 'UŻYTKOWNIK'}
+                        </Badge>
+                        <Badge colorScheme={twoFaStatus ? 'green' : 'gray'} px={3} py={1} borderRadius="full" variant="subtle">
+                            {twoFaStatus ? '2FA AKTYWNE' : '2FA BRAK'}
+                        </Badge>
+                    </HStack>
+                </Box>
+            </Card>
+        </Box>
+
+        {/* --- PRAWA KOLUMNA: ZAKŁADKI I FORMULARZE --- */}
+        <Box gridColumn={{ base: "span 1", lg: "span 8" }}>
+            <Card bg={cardBg} boxShadow="xl" borderRadius="2xl" border="1px" borderColor={borderColor} minH="550px">
+                <Tabs variant="enclosed-colored" colorScheme="blue" isLazy p={2}>
+                    
+                    <TabList mb={2} px={4} pt={4}>
+                        <Tab fontWeight="bold" _selected={{ color: 'blue.600', bg: 'blue.50', borderColor: 'blue.200' }}>
+                            <EditIcon mr={2}/> Dane Osobowe
+                        </Tab>
+                        <Tab fontWeight="bold" _selected={{ color: 'blue.600', bg: 'blue.50', borderColor: 'blue.200' }}>
+                            {/* POPRAWKA: Zastąpiono ShieldIcon przez LockIcon */}
+                            <LockIcon mr={2} /> Bezpieczeństwo
+                        </Tab>
+                    </TabList>
+
+                    <TabPanels px={4} pb={6}>
+                        
+                        {/* === ZAKŁADKA 1: DANE OSOBOWE === */}
+                        <TabPanel>
+                            <VStack spacing={6} align="stretch" maxW="lg">
+                                <Heading size="md" mb={2}>Informacje Podstawowe</Heading>
+                                <Text fontSize="sm" color="gray.500">Zarządzaj swoimi danymi widocznymi w systemie.</Text>
+
+                                <Divider />
+
+                                <FormControl>
+                                    <FormLabel color="gray.500" fontSize="xs" textTransform="uppercase" fontWeight="bold">Adres E-mail (Login)</FormLabel>
+                                    <Input 
+                                        value={profileData.email} 
+                                        isReadOnly 
+                                        variant="filled" 
+                                        bg="gray.100" 
+                                        _dark={{ bg: 'gray.700' }} 
+                                        cursor="not-allowed" 
+                                        color="gray.500"
+                                    />
+                                    <Text fontSize="xs" mt={1} color="gray.400">Adresu e-mail nie można zmienić samodzielnie.</Text>
+                                </FormControl>
+
+                                <FormControl>
+                                    <FormLabel fontSize="sm" fontWeight="bold">Nazwa Wyświetlana</FormLabel>
+                                    <InputGroup size="md">
+                                        <Input 
+                                            value={isEditingProfile ? tempName : profileData.name} 
+                                            onChange={(e) => setTempName(e.target.value)}
+                                            isReadOnly={!isEditingProfile}
+                                            variant={isEditingProfile ? "outline" : "filled"}
+                                            focusBorderColor="blue.500"
+                                            placeholder="Np. Jan Kowalski"
+                                        />
+                                        <InputRightElement width="6rem">
+                                            {!isEditingProfile ? (
+                                                <Button h="1.75rem" size="sm" onClick={() => setIsEditingProfile(true)}>
+                                                    Edytuj
+                                                </Button>
+                                            ) : (
+                                                <HStack spacing={1} mr={1}>
+                                                    <IconButton size="xs" icon={<CheckIcon />} colorScheme="green" onClick={handleSaveProfile} aria-label="Zapisz"/>
+                                                    <IconButton size="xs" icon={<CloseIcon />} onClick={() => { setIsEditingProfile(false); setTempName(profileData.name); }} aria-label="Anuluj"/>
+                                                </HStack>
+                                            )}
+                                        </InputRightElement>
+                                    </InputGroup>
+                                </FormControl>
+                            </VStack>
+                        </TabPanel>
+
+                        {/* === ZAKŁADKA 2: BEZPIECZEŃSTWO === */}
+                        <TabPanel>
+                            <VStack spacing={8} align="stretch">
+                                
+                                {/* 1. ZMIANA HASŁA */}
+                                <Box>
+                                    <HStack mb={4}>
+                                        <LockIcon color="blue.500" />
+                                        <Heading size="md">Zmiana Hasła</Heading>
+                                    </HStack>
+                                    
+                                    <form onSubmit={handleChangePassword}>
+                                        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                                            <FormControl gridColumn={{ md: "span 2" }}>
+                                                <FormLabel fontSize="sm">Obecne hasło</FormLabel>
+                                                <Input type="password" value={passwords.current} onChange={e => setPasswords({...passwords, current: e.target.value})} bg={useColorModeValue("white", "gray.700")} />
+                                            </FormControl>
+                                            <FormControl>
+                                                <FormLabel fontSize="sm">Nowe hasło</FormLabel>
+                                                <InputGroup>
+                                                    <Input type={showPass ? 'text' : 'password'} value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} bg={useColorModeValue("white", "gray.700")} />
+                                                    <InputRightElement>
+                                                        <IconButton size="sm" variant="ghost" icon={showPass ? <ViewOffIcon /> : <ViewIcon />} onClick={() => setShowPass(!showPass)} />
+                                                    </InputRightElement>
+                                                </InputGroup>
+                                            </FormControl>
+                                            <FormControl>
+                                                <FormLabel fontSize="sm">Potwierdź hasło</FormLabel>
+                                                <Input type="password" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} bg={useColorModeValue("white", "gray.700")} />
+                                            </FormControl>
+                                        </SimpleGrid>
+                                        <Box mt={4} textAlign="right">
+                                            <Button type="submit" colorScheme="blue" size="sm" isLoading={isChangingPass} disabled={!passwords.current || !passwords.new}>
+                                                Zaktualizuj Hasło
+                                            </Button>
+                                        </Box>
+                                    </form>
+                                </Box>
+
+                                <Divider />
+
+                                {/* 2. ZARZĄDZANIE 2FA */}
+                                <Box>
+                                    <HStack mb={2} justify="space-between">
+                                        <HStack>
+                                            {/* POPRAWKA: Zastąpiono ShieldIcon przez LockIcon z odpowiednim kolorem */}
+                                            <LockIcon color={twoFaStatus ? "green.500" : "orange.500"} />
+                                            <Heading size="md">Weryfikacja Dwuetapowa (2FA)</Heading>
+                                        </HStack>
+                                        <Badge colorScheme={twoFaStatus ? 'green' : 'gray'}>
+                                            {twoFaStatus ? 'STATUS: AKTYWNE' : 'STATUS: NIEAKTYWNE'}
+                                        </Badge>
+                                    </HStack>
+                                    
+                                    <Text color="gray.500" fontSize="sm" mb={4}>
+                                        Zabezpiecz swoje konto dodatkowym kodem generowanym przez aplikację Google Authenticator.
+                                    </Text>
+
+                                    {/* PRZYCISK STARTOWY */}
+                                    {!twoFaStatus && !twoFaSetupData && (
+                                        <Button colorScheme="green" leftIcon={<CheckIcon />} onClick={setup2FA} isLoading={isProcessingTwoFa}>
+                                            Skonfiguruj i Włącz 2FA
+                                        </Button>
+                                    )}
+
+                                    {/* KONFIGURACJA (QR CODE) */}
+                                    <Fade in={!!twoFaSetupData} unmountOnExit>
+                                        <Box bg="blue.50" _dark={{ bg: 'blue.900' }} p={5} borderRadius="md" border="1px dashed" borderColor="blue.300">
+                                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+                                                {/* Krok 1: QR */}
+                                                <VStack bg="white" p={4} borderRadius="md" _dark={{ bg: 'gray.800' }}>
+                                                    <Text fontWeight="bold" fontSize="sm">1. Zeskanuj kod QR</Text>
+                                                    <Image 
+                                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(twoFaSetupData?.otpauth_url || '')}`} 
+                                                        boxSize="160px" 
+                                                        alt="QR Code"
+                                                    />
+                                                    <Text fontSize="xs" color="gray.500">Lub wpisz klucz ręcznie:</Text>
+                                                    <HStack w="full">
+                                                        <Input value={twoFaSetupData?.secret} isReadOnly fontFamily="monospace" size="xs" />
+                                                        <Button size="xs" onClick={onCopy}>{hasCopied ? 'OK' : 'Kopiuj'}</Button>
+                                                    </HStack>
+                                                </VStack>
+
+                                                {/* Krok 2: Weryfikacja */}
+                                                <VStack align="start" justify="center">
+                                                    <Text fontWeight="bold" fontSize="sm">2. Potwierdź kodem z aplikacji</Text>
+                                                    <Text fontSize="xs" color="gray.600" _dark={{ color: 'gray.300' }}>
+                                                        Wprowadź 6-cyfrowy kod, który wyświetlił się w Twojej aplikacji uwierzytelniającej.
+                                                    </Text>
+                                                    
+                                                    <HStack w="full" mt={2}>
+                                                        <Input 
+                                                            placeholder="000 000" 
+                                                            maxLength={6} 
+                                                            textAlign="center" 
+                                                            value={twoFaCode} 
+                                                            onChange={e => setTwoFaCode(e.target.value.replace(/\D/,''))} 
+                                                            bg="white" 
+                                                            _dark={{ bg: 'gray.800' }} 
+                                                            fontSize="lg"
+                                                            letterSpacing="widest"
+                                                        />
+                                                    </HStack>
+                                                    
+                                                    <HStack w="full" mt={2}>
+                                                        <Button colorScheme="green" width="full" onClick={() => finalize2FA(false)} isLoading={isProcessingTwoFa}>
+                                                            Aktywuj 2FA
+                                                        </Button>
+                                                        <Button variant="ghost" width="full" onClick={() => { setTwoFaSetupData(null); setTwoFaCode(''); }}>
+                                                            Anuluj
+                                                        </Button>
+                                                    </HStack>
+                                                </VStack>
+                                            </SimpleGrid>
+                                        </Box>
+                                    </Fade>
+
+                                    {/* WYŁĄCZANIE 2FA */}
+                                    {twoFaStatus && (
+                                        <Box mt={4}>
+                                            {!twoFaSetupData ? (
+                                                <Button colorScheme="red" variant="outline" size="sm" onClick={() => setTwoFaSetupData({ disabling: true })}>
+                                                    Chcę wyłączyć 2FA
+                                                </Button>
+                                            ) : (
+                                                <VStack align="start" bg="red.50" _dark={{ bg: 'red.900' }} p={4} borderRadius="md" border="1px solid" borderColor="red.200">
+                                                    <Text fontWeight="bold" color="red.600" _dark={{ color: 'red.200' }}>Potwierdź wyłączenie zabezpieczeń</Text>
+                                                    <Text fontSize="sm" mb={2}>Aby wyłączyć 2FA, podaj aktualny kod z aplikacji.</Text>
+                                                    
+                                                    <HStack>
+                                                        <Input 
+                                                            placeholder="123456" 
+                                                            maxLength={6} 
+                                                            w="120px"
+                                                            textAlign="center" 
+                                                            value={twoFaCode} 
+                                                            onChange={e => setTwoFaCode(e.target.value.replace(/\D/,''))} 
+                                                            bg="white" 
+                                                            _dark={{ bg: 'gray.800' }} 
+                                                        />
+                                                        <Button colorScheme="red" onClick={() => finalize2FA(true)} isLoading={isProcessingTwoFa}>
+                                                            Wyłącz trwale
+                                                        </Button>
+                                                        <IconButton icon={<CloseIcon />} onClick={() => { setTwoFaSetupData(null); setTwoFaCode(''); }} aria-label="Anuluj" />
+                                                    </HStack>
+                                                </VStack>
+                                            )}
+                                        </Box>
+                                    )}
+                                </Box>
+
+                            </VStack>
+                        </TabPanel>
+                    </TabPanels>
+                </Tabs>
+            </Card>
+        </Box>
       </SimpleGrid>
-
-      {/* // ------------------------------------
-      // ⭐️⭐️ POCZĄTEK: NOWA SEKCJA 2FA ⭐️⭐️
-      // ------------------------------------
-      */}
-      <Divider my={8} />
-
-      <Box>
-        <Heading size="md" mb={4}>Zarządzanie 2FA</Heading>
-        <HStack spacing={4} mb={4}>
-          <Text>Status Uwierzytelniania Dwuskładnikowego:</Text>
-          {renderTwoFaStatus()}
-        </HStack>
-
-        {/* Główny przycisk Włącz/Wyłącz */}
-        {!twoFaSetupData && !twoFaStatus && (
-          <Button
-            colorScheme="green"
-            onClick={handleSetup2FA}
-            isLoading={isProcessingTwoFa}
-          >
-            Włącz 2FA
-          </Button>
-        )}
-        {!twoFaSetupData && twoFaStatus && (
-          <Button
-            colorScheme="red"
-            onClick={() => setTwoFaSetupData({ disabling: true })} // Otwórz sekcję wyłączania
-            isLoading={isProcessingTwoFa}
-          >
-            Wyłącz 2FA
-          </Button>
-        )}
-        
-        {/* Renderowanie sekcji Włączania lub Wyłączania.
-          Ta funkcja zwróci null, jeśli żaden proces nie jest aktywny.
-        */}
-        {renderTwoFaSection()}
-        
-      </Box>
-      {/* // ------------------------------------
-      // ⭐️⭐️ KONIEC: NOWA SEKCJA 2FA ⭐️⭐️
-      // ------------------------------------
-      */}
-
-    </Box>
+    </Container>
   );
 }
-
-export default AccountPage;
