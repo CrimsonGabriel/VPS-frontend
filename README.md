@@ -1,16 +1,57 @@
-# React + Vite
+# Smart Home Ecosystem – Web Management Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![Status](https://img.shields.io/badge/Status-Completed-brightgreen)
+![Component](https://img.shields.io/badge/System-Web%20Dashboard-green)
 
-Currently, two official plugins are available:
+A responsive administrative web dashboard for the **Smart Home Ecosystem**. Allows users to inspect real-time sensor metrics, monitor system status, view interactive charts, and remotely toggle home actuators from any modern desktop or mobile browser.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## Key Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Real-Time Data Streaming:** Instant UI updates for sensor changes via WebSockets.
+- **Device Management:** Interactive controls for lamps, relays, and environmental monitors.
+- **Historical Analytics:** Visual charts displaying temperature, humidity, and energy consumption trends over time.
+- **Responsive UI:** Dark fantasy/modern dark-mode interface optimized for desktop and mobile viewports.
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Author
+
+- **Gabriel ([@CrimsonGabriel](https://github.com/CrimsonGabriel))** – Frontend development, state management, and API integration.
+
+---
+
+## Related Repositories
+
+- [Central VPS Backend](https://github.com/CrimsonGabriel/VPS-backend)
+- [Raspberry Pi Node](https://github.com/CrimsonGabriel/RaspberryPI)
+- [Android App Repository](https://github.com/CrimsonGabriel/Android-SmartHome)
+```mermaid
+graph TD
+    subgraph Clients["📱 & 💻 Client Layer"]
+        APP["📱 Android App<br/>(Mobile Client)"]
+        WEB["💻 Web Dashboard<br/>(VPS Frontend)"]
+    end
+
+    subgraph Cloud["☁️ Cloud Infrastructure"]
+        VPS["⚡ Central VPS Backend<br/>(REST API / WebSockets / DB)"]
+    end
+
+    subgraph Edge["🔌 Edge & Hardware Layer"]
+        RPI["🔌 Raspberry Pi<br/>(IoT Edge Node)"]
+        SENSORS["🌡️ Sensors & Actuators<br/>(Relays, Temp, Motion)"]
+    end
+
+    %% Connections
+    APP <-->|"REST API / WebSockets"| VPS
+    WEB <-->|"REST API / WebSockets"| VPS
+    VPS <-->|"Telemetry / Commands (MQTT/REST)"| RPI
+    RPI <-->|"GPIO / Serial"| SENSORS
+
+    %% Styling
+    style VPS fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style RPI fill:#1e293b,stroke:#f97316,stroke-width:2px,color:#fff
+    style APP fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
+    style WEB fill:#1e293b,stroke:#22c55e,stroke-width:2px,color:#fff
+    style SENSORS fill:#0f172a,stroke:#64748b,stroke-width:1px,color:#94a3b8
